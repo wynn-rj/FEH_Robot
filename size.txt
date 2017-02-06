@@ -1,0 +1,2 @@
+   text	   data	    bss	    dec	    hex	filename
+  30552	   3420	   5552	  39524	   9a64	../FEH_Robot.elf
