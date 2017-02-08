@@ -17,17 +17,18 @@
 
 /////////////////////////////////////REGION: Declerations/////////////////////////////////////
 
-/* Structure declerations */
+/* Class declerations */
 
-//Course Struct used to for proteus to know what course it is on and extra info for that course
-typedef struct Course
+//Course Class used to for proteus to know what course it is on and extra info for that course
+class Course
 {
 public:
     Course(char);
+    Course();
 
 private:
     char courseLetter;
-} Course;
+};
 
 /* Function declerations */
 
@@ -51,7 +52,7 @@ int main(void)
 
     //Starting SD log file
     SD.OpenLog();
-    SD.Printf("Initializing Log");
+    SD.Printf("Initializing Log\n");
 
     //Determine course robot located on
     currentCourse = initMenu();
@@ -97,7 +98,7 @@ Course initMenu()
     Buzzer.Buzz(beep_t);
 
 
-    while(noCourseSelected)
+    do
     {
         //Display average battery voltage to screen
         bat_v = ((bat_v*m)+Battery.Voltage());
@@ -110,22 +111,31 @@ Course initMenu()
             {
                 if (MAIN[n].Pressed(x, y, 0))
                 {
+                    char letter[2] = {main_label[n][0], ' '};
+                    if (n == 0)
+                        letter[0] = 'A';
+                    if (n == 1)
+                        letter[0] = 'B';
+
                     //States selected course to screen and log
                     LCD.Clear(BLACK);
                     LCD.WriteLine("Course   Selected");
-                    LCD.WriteRC(main_label[n], 0, 7);
+                    LCD.WriteRC(letter, 0, 7);
+                    LCD.WriteRC(n, 0, 20);
                     SD.Printf("Selecting Course: ");
-                    SD.Printf(main_label[n]);
-                    SD.Printf("\n");
+                    SD.Printf(letter);
+                    SD.Printf("\n");                    
 
-                    selectedCourse = new Course(main_label[n][0]);
+                    selectedCourse = Course(letter[0]);
 
                     noCourseSelected = false;
                     break;
                 }
             }
         }
-    }
+    } while(noCourseSelected);
+
+    return selectedCourse;
 }
 
 /////////////////////////////////////REGION: Struct Definitions/////////////////////////////////////
@@ -137,12 +147,13 @@ Course initMenu()
  *      A char that is used to define which
  *      course the robot is starting on
  */
-Course::Course(char courseLet)
+Course::Course(char c)
 {
-    Course::courseLetter = courseLet;
+    courseLetter = c;
 }
+
+Course::Course(){}
 
 /////////////////////////////////////////////END REGION/////////////////////////////////////////////
 
 
-,
