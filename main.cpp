@@ -2,6 +2,21 @@
 #include <FEHIO.h>
 #include <FEHUtility.h>
 #include <FEHSD.h>
+#include <FEHBattery.h>
+#include <FEHBuzzer.h>
+
+/* Define colors for parts of menus */
+#define MENU_C WHITE
+#define TEXT_C GOLD
+#define SELT_C RED
+#define SHOW_C BLUE
+#define HI_C GREEN
+
+/* Define menu number values */
+#define MN_MENU 0
+
+/* Define time for beep */
+#define beep_t 10 // int milliseconds
 
 int initMenu();
 
@@ -10,6 +25,7 @@ int main(void)
     //CLears the LCD of anything previously on it
     LCD.Clear(FEHLCD::Black);
     LCD.SetFontColor(FEHLCD::White);
+
 
     //Starting SD log file
     SD.OpenLog();
