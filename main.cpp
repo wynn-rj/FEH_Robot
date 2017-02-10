@@ -4,18 +4,28 @@
 #include <FEHSD.h>
 #include <FEHBattery.h>
 #include <FEHBuzzer.h>
+#include <FEHServo.h>
+#include <FEHMotor.h>
+#include <robotdefinitions.h>
 
-/* Define colors for parts of menus */
-#define MENU_C WHITE
-#define TEXT_C GOLD
-#define SELT_C RED
-#define SHOW_C BLUE
-#define HI_C GREEN
 
-/* Define time for beep */
-#define beep_t 10 // int milliseconds
 
 /////////////////////////////////////REGION: Declerations/////////////////////////////////////
+
+/* Global Variable Decleration */
+
+FEHMotor leftMotor(DT_MOTOR_L, DT_MOTOR_LV);
+FEHMotor rightMotor(DT_MOTOR_R, DT_MOTOR_RV);
+
+FEHServo servoArm(SRV_ARM);
+
+AnalogInputPin buttonTopLeft(BUTTON_TOP_LEFT);
+AnalogInputPin buttonTopRight(BUTTON_TOP_RIGHT);
+AnalogInputPin buttonBottomLeft(BUTTON_BOTTOM_LEFT);
+AnalogInputPin buttonBottomRight(BUTTON_BOTTOM_RIGHT);
+
+DigitalInputPin CdS(CDS_CELL);
+
 
 /* Class declerations */
 
@@ -35,6 +45,66 @@ private:
 Course initMenu();
 
 //////////////////////////////////////////END REGION//////////////////////////////////////////
+
+void labTest()
+{
+    /*
+    FEHServo servo(FEHServo::Servo0);
+    AnalogInputPin CdS(FEHIO::P0_0);
+    servo.SetMin(500);
+    servo.SetMax(2495);
+
+    while(true)
+    {
+        servo.SetDegree((56*CdS.Value()));
+        LCD.WriteRC(CdS.Value(),0,0);
+    }
+    */
+    DigitalInputPin button1 (FEHIO::P0_0);
+    DigitalInputPin button2 (FEHIO::P1_0);
+    DigitalInputPin button3 (FEHIO::P2_0);
+    DigitalInputPin button4 (FEHIO::P3_0);
+
+    FEHMotor rightMotor(FEHMotor::Motor0, 12.0);
+    FEHMotor leftMotor(FEHMotor::Motor1, 12.0);
+
+    rightMotor.SetPercent(50.);
+    leftMotor.SetPercent(50.);
+
+    while (button1.Value() && button2.Value()) {}
+    rightMotor.SetPercent(-50.);
+    leftMotor.SetPercent(-10.);
+
+    while (button4.Value()) {}
+    leftMotor.Stop();
+
+    while (button3.Value()) {}
+    rightMotor.Stop();
+
+    Sleep(500);
+
+    rightMotor.SetPercent(50.);
+    leftMotor.SetPercent(50.);
+
+    while (button1.Value() && button2.Value()) {}
+    rightMotor.SetPercent(-10.);
+    leftMotor.SetPercent(-50.);
+
+    while (button3.Value()) {}
+    rightMotor.Stop();
+
+    while (button4.Value()) {}
+    leftMotor.Stop();
+
+    Sleep(500);
+
+    rightMotor.SetPercent(50.);
+    leftMotor.SetPercent(50.);
+
+    while (button1.Value() && button2.Value()) {}
+    rightMotor.Stop();
+    leftMotor.Stop();
+}
 
 /**
  * @brief main
@@ -56,6 +126,10 @@ int main(void)
 
     //Determine course robot located on
     currentCourse = initMenu();
+
+    //Set Servo Values
+    servoArm.SetMax(SRV_MAX);
+    servoArm.SetMin(SRV_MIN);
 
     //Closing SD log file
     SD.Printf("Closing Log");
@@ -94,9 +168,6 @@ Course initMenu()
 
     LCD.SetFontColor(TEXT_C);
     LCD.WriteAt("BATT:        V", 0, 222);
-
-    Buzzer.Buzz(beep_t);
-
 
     do
     {
