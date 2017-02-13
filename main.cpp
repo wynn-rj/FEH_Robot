@@ -6,7 +6,9 @@
 #include <FEHBuzzer.h>
 #include <FEHServo.h>
 #include <FEHMotor.h>
+#include <FEHRPS.h>
 #include <robotdefinitions.h>
+#include <math.h>
 
 
 
@@ -17,15 +19,18 @@
 FEHMotor leftMotor(DT_MOTOR_L, DT_MOTOR_LV);
 FEHMotor rightMotor(DT_MOTOR_R, DT_MOTOR_RV);
 
+DigitalEncoder rightEncoder(MTR_ENCODE_R);
+DigitalEncoder leftEncoder(MTR_ENCODE_L);
+
 FEHServo servoArm(SRV_ARM);
+FEHServo servoForkLift(SRV_FRK_LFT);
 
-AnalogInputPin buttonTopLeft(BUTTON_TOP_LEFT);
-AnalogInputPin buttonTopRight(BUTTON_TOP_RIGHT);
-AnalogInputPin buttonBottomLeft(BUTTON_BOTTOM_LEFT);
-AnalogInputPin buttonBottomRight(BUTTON_BOTTOM_RIGHT);
+DigitalInputPin buttonTopLeft(BUTTON_TOP_LEFT);
+DigitalInputPin buttonTopRight(BUTTON_TOP_RIGHT);
+DigitalInputPin buttonBottomLeft(BUTTON_BOTTOM_LEFT);
+DigitalInputPin buttonBottomRight(BUTTON_BOTTOM_RIGHT);
 
-DigitalInputPin CdS(CDS_CELL);
-
+AnalogInputPin CdS(CDS_CELL);
 
 /* Class declerations */
 
@@ -43,12 +48,24 @@ private:
 /* Function declerations */
 
 Course initMenu();
+void extendRetractArm(bool);
+void setForkLiftPos(float);
+void waitToStart();
+unsigned int readCdS();
+void drive(float, float);
+void drive(float);
+void driveTilHitSide(bool, ButtonSide);
+void turn(float, bool);
+void turn(bool);
+void driveToCoord(float, float);
+
 
 //////////////////////////////////////////END REGION//////////////////////////////////////////
 
+/*
 void labTest()
 {
-    /*
+
     FEHServo servo(FEHServo::Servo0);
     AnalogInputPin CdS(FEHIO::P0_0);
     servo.SetMin(500);
@@ -59,7 +76,7 @@ void labTest()
         servo.SetDegree((56*CdS.Value()));
         LCD.WriteRC(CdS.Value(),0,0);
     }
-    */
+
     DigitalInputPin button1 (FEHIO::P0_0);
     DigitalInputPin button2 (FEHIO::P1_0);
     DigitalInputPin button3 (FEHIO::P2_0);
@@ -105,6 +122,7 @@ void labTest()
     rightMotor.Stop();
     leftMotor.Stop();
 }
+*/
 
 /**
  * @brief main
@@ -125,11 +143,16 @@ int main(void)
     SD.Printf("Initializing Log\n");
 
     //Determine course robot located on
+
+    //RPS.InitializeTouchMenu();
     currentCourse = initMenu();
 
     //Set Servo Values
     servoArm.SetMax(SRV_MAX);
     servoArm.SetMin(SRV_MIN);
+
+    servoForkLift.SetMax(SRV_FRK_MAX);
+    servoForkLift.SetMin(SRV_FRK_MIN);
 
     //Closing SD log file
     SD.Printf("Closing Log");
@@ -175,6 +198,10 @@ Course initMenu()
         bat_v = ((bat_v*m)+Battery.Voltage());
         bat_v = bat_v/(++m);
         LCD.WriteAt(bat_v, 72, 222);
+        if(bat_v < 10)
+        {
+            Buzzer.Buzz(10);
+        }
         if (LCD.Touch(&x, &y))
         {
             //Check to see if a main menu icon has been touched
@@ -193,6 +220,7 @@ Course initMenu()
                     LCD.WriteLine("Course   Selected");
                     LCD.WriteRC(letter, 0, 7);
                     LCD.WriteRC(n, 0, 20);
+                    LCD.WriteRC(sqrt(4.0),0, 22);
                     SD.Printf("Selecting Course: ");
                     SD.Printf(letter);
                     SD.Printf("\n");                    
@@ -208,6 +236,194 @@ Course initMenu()
 
     return selectedCourse;
 }
+
+/**
+ * @brief extendRetractArm
+ *      Sets the satelite arm to max or min
+ * @param isExtending
+ *      If it is true sets it to max, otherwise set to min
+ */
+void extendRetractArm(bool isExtending){
+    if(isExtending)
+    {
+        servoArm.SetDegree(SERVO_FULL_EXT);
+    } else {
+        servoArm.SetDegree(SERVO_NO_EXT);
+    }
+}
+
+void setForkLiftPos(float percent)
+{
+    servoForkLift.SetDegree((percent/100)*(SRV_FRK_MAX-SRV_FRK_MIN) + SRV_FRK_MIN);
+}
+
+/**
+ * @brief waitToStart
+ *      For the beginning for the robot to wait to start
+ */
+void waitToStart()
+{
+    while(readCdS() != RED){}
+    SD.Printf("\n==STARTING COURSE==\n\n");
+}
+
+/**
+ * @brief readCdS
+ *      Reads the CdS cell
+ * @return
+ *      The color of the light, Black, Red, or Blue
+ */
+unsigned int readCdS()
+{
+    //TODO: Fix how this works
+    unsigned int retColor;   //Color to return
+
+    if(CdS.Value() > RED_LIGHT)
+    {
+        retColor = RED;
+    } else if(CdS.Value() > BLUE_LIGHT) {
+        retColor = BLUE;
+    } else {
+        retColor = BLACK;
+    }
+
+    LCD.Clear(retColor);
+    return retColor;
+}
+
+/////////////////////////////////////REGION: Drive Functions/////////////////////////////////////
+
+
+/**
+ * @brief drive
+ *      Set the speed of both motors seperatly
+ * @param rMPercent
+ *      Percent for right motor
+ * @param lMPercent
+ *      Percent for left motor
+ */
+void drive(float rMPercent, float lMPercent)
+{
+    if(rMPercent <= .05)
+    {
+        rightMotor.Stop();
+    } else {
+        rightMotor.SetPercent(rMPercent);
+    }
+
+    if(lMPercent <= .05)
+    {
+        leftMotor.Stop();
+    } else {
+        leftMotor.SetPercent(lMPercent);
+    }
+}
+
+/**
+ * @brief drive
+ *      Set the speed of both motors
+ * @param mPercent
+ *      Percent for both motors
+ */
+void drive(float mPercent)
+{
+    drive(mPercent, mPercent);
+}
+
+/**
+ * @brief driveTilHitSide
+ *      Drive forward at max speed till both buttons on the side are hit
+ * @param forward
+ *      If the the robot is supposed to move forward
+ * @param side
+ *      What side the robot is to hit
+ */
+void driveTilHitSide(bool forward, ButtonSide side)
+{
+    int direction = (forward) ? 1:-1;
+    drive(direction * MAX);
+    switch (side) {
+    case front:
+        while (buttonTopLeft.Value() && buttonTopRight.Value()) {}
+        break;
+    case back:
+        while (buttonBottomLeft.Value() && buttonBottomRight.Value()) {}
+        break;
+    default:
+        SD.Printf("[driveTilHitSide] ERROR: Call to non defined ButtonSide Case\n");
+        break;
+    }
+    drive(STOP);
+}
+
+/**
+ * @brief turn
+ *      Turn the proteus in place the specified degree to the right or left
+ * @param degree
+ *      How far the proteus is to turn
+ * @param goRight
+ *      Whether or not to turn right or left
+ */
+void turn(float degree, bool goRight)
+{
+    int rDirection = (goRight) ? 1:-1;
+    int lDirection = (goRight) ? -1:1;
+
+    drive(rDirection * MAX, lDirection * MAX);
+    Sleep(1);  //Fix this
+    drive(STOP);
+}
+
+/**
+ * @brief turn
+ * @param goRight
+ */
+void turn(bool goRight)
+{
+    int rDirection = (goRight) ? 1:-1;
+    int lDirection = (goRight) ? -1:1;
+
+    drive(rDirection * MAX, lDirection * MAX);
+}
+
+/**
+ * @brief driveToCoord
+ *      The robot takes the shortest path to the given coords
+ * @param x
+ *      The x coordinate to go to
+ * @param y
+ *      The y coordinate to go to
+ */
+void driveToCoord(float x, float y)
+{
+    float currHeading = RPS.Heading();
+    float currX = RPS.X(),
+          currY = RPS.Y();
+
+    float distanceToTravel = sqrtf(pow(x-currX, 2) + pow(y-currY, 2));
+    float directionToHead = atan2f(y-currY,x-currX) * (180.0/M_PI);
+    //Switches directions to be from 0 to 360
+    directionToHead = (directionToHead > 0.0 ? directionToHead: (360.0+directionToHead));
+    if(directionToHead < currHeading && (currHeading - directionToHead) < 180)
+    {
+        turn(RIGHT);
+        while(abs(RPS.Heading() - directionToHead) > .1){}
+        drive(STOP);
+    } else {
+        turn(LEFT);
+        while(abs(RPS.Heading() - directionToHead) > .1){}
+        drive(STOP);
+    }
+    rightEncoder.ResetCounts();
+
+    drive(MAX);
+    while((rightEncoder.Counts() * (WHEEL_RAD * 2 * M_PI)) < distanceToTravel){}
+    drive(STOP);
+
+}
+
+/////////////////////////////////////////////END REGION//////////////////////////////////////////
+
 
 /////////////////////////////////////REGION: Struct Definitions/////////////////////////////////////
 
