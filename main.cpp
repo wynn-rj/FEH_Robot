@@ -14,6 +14,44 @@
 
 /////////////////////////////////////REGION: Declerations/////////////////////////////////////
 
+/* Class declerations */
+
+class Coord
+{
+public:
+    float x, y;
+    Coord(float, float);
+    Coord();
+};
+
+//Course Class used to for proteus to know what course it is on and extra info for that course
+class Course
+{
+public:
+    Course(char);
+    Course();
+    Coord satelite, lever, seismoButton, core, coreDepo, home;
+
+private:
+    char courseLetter;
+};
+
+
+/* Function declerations */
+
+Course initMenu();
+void queState(State);
+void extendRetractArm(bool);
+void setForkLiftPos(float);
+unsigned int readCdS();
+void drive(float, float);
+void drive(float);
+bool checkTouchingSide(ButtonSide);
+void turn(bool);
+void rotateTo(float);
+void driveToCoord(Coord);
+
+
 /* Global Variable Decleration */
 
 FEHMotor leftMotor(DT_MOTOR_L, DT_MOTOR_LV);
@@ -32,97 +70,20 @@ DigitalInputPin buttonBottomRight(BUTTON_BOTTOM_RIGHT);
 
 AnalogInputPin CdS(CDS_CELL);
 
-/* Class declerations */
+bool runningCourse;
+State currentState;
 
-//Course Class used to for proteus to know what course it is on and extra info for that course
-class Course
-{
-public:
-    Course(char);
-    Course();
+float distanceToTravel;
+Coord destination;
 
-private:
-    char courseLetter;
-};
-
-/* Function declerations */
-
-Course initMenu();
-void extendRetractArm(bool);
-void setForkLiftPos(float);
-void waitToStart();
-unsigned int readCdS();
-void drive(float, float);
-void drive(float);
-void driveTilHitSide(bool, ButtonSide);
-void turn(float, bool);
-void turn(bool);
-void driveToCoord(float, float);
+const char STATE_NAMES[19][20] = {"waitToStart", "startMoveSat", "moveToSat", "interactSat",
+                                 "startMoveLever", "moveToLever", "interactLever", "startMoveSismoBut",
+                                 "moveToSismoBut", "interactSismoBut", "startMoveCore", "moveToCore",
+                                 "interactCore", "startMoveDepCore", "moveToDepCore", "interactDepCore",
+                                 "startMoveRet", "moveToRet", "shutdown"};
 
 
 //////////////////////////////////////////END REGION//////////////////////////////////////////
-
-/*
-void labTest()
-{
-
-    FEHServo servo(FEHServo::Servo0);
-    AnalogInputPin CdS(FEHIO::P0_0);
-    servo.SetMin(500);
-    servo.SetMax(2495);
-
-    while(true)
-    {
-        servo.SetDegree((56*CdS.Value()));
-        LCD.WriteRC(CdS.Value(),0,0);
-    }
-
-    DigitalInputPin button1 (FEHIO::P0_0);
-    DigitalInputPin button2 (FEHIO::P1_0);
-    DigitalInputPin button3 (FEHIO::P2_0);
-    DigitalInputPin button4 (FEHIO::P3_0);
-
-    FEHMotor rightMotor(FEHMotor::Motor0, 12.0);
-    FEHMotor leftMotor(FEHMotor::Motor1, 12.0);
-
-    rightMotor.SetPercent(50.);
-    leftMotor.SetPercent(50.);
-
-    while (button1.Value() && button2.Value()) {}
-    rightMotor.SetPercent(-50.);
-    leftMotor.SetPercent(-10.);
-
-    while (button4.Value()) {}
-    leftMotor.Stop();
-
-    while (button3.Value()) {}
-    rightMotor.Stop();
-
-    Sleep(500);
-
-    rightMotor.SetPercent(50.);
-    leftMotor.SetPercent(50.);
-
-    while (button1.Value() && button2.Value()) {}
-    rightMotor.SetPercent(-10.);
-    leftMotor.SetPercent(-50.);
-
-    while (button3.Value()) {}
-    rightMotor.Stop();
-
-    while (button4.Value()) {}
-    leftMotor.Stop();
-
-    Sleep(500);
-
-    rightMotor.SetPercent(50.);
-    leftMotor.SetPercent(50.);
-
-    while (button1.Value() && button2.Value()) {}
-    rightMotor.Stop();
-    leftMotor.Stop();
-}
-*/
 
 /**
  * @brief main
@@ -137,6 +98,12 @@ int main(void)
     LCD.Clear(FEHLCD::Black);
     LCD.SetFontColor(FEHLCD::White);
 
+    //Set Servo Values
+    servoArm.SetMax(SRV_MAX);
+    servoArm.SetMin(SRV_MIN);
+
+    servoForkLift.SetMax(SRV_FRK_MAX);
+    servoForkLift.SetMin(SRV_FRK_MIN);
 
     //Starting SD log file
     SD.OpenLog();
@@ -146,13 +113,170 @@ int main(void)
 
     //RPS.InitializeTouchMenu();
     currentCourse = initMenu();
+    runningCourse = true;
 
-    //Set Servo Values
-    servoArm.SetMax(SRV_MAX);
-    servoArm.SetMin(SRV_MIN);
+    while(runningCourse)
+    {
+		switch (currentState)
+		{
+        case waitToStart:
+            if(readCdS() == RED)
+            {
+                SD.Printf("\n==STARTING COURSE==\n\n");
+                queState(startMoveSat);
+            }
+            break;
 
-    servoForkLift.SetMax(SRV_FRK_MAX);
-    servoForkLift.SetMin(SRV_FRK_MIN);
+        case startMoveSat:
+            driveToCoord(currentCourse.satelite);
+            queState(moveToSat);
+            extendRetractArm(true);
+            break;
+        case moveToSat:
+
+            if((rightEncoder.Counts() * (WHEEL_RAD * 2 * M_PI)) < distanceToTravel)
+            {
+                drive(STOP);
+                queState(interactSat);
+            }
+            break;
+
+        case interactSat:
+
+            queState(startMoveLever);
+            extendRetractArm(true);
+            break;
+
+        case startMoveLever:
+            driveToCoord(currentCourse.lever);
+            queState(moveToLever);
+            break;
+
+        case moveToLever:
+            if((rightEncoder.Counts() * (WHEEL_RAD * 2 * M_PI)) < distanceToTravel)
+            {
+                drive(STOP);
+                queState(interactLever);
+            }
+            break;
+
+        case interactLever:
+
+            queState(startMoveSismoBut);
+            break;
+        case startMoveSismoBut:
+            driveToCoord(currentCourse.seismoButton);
+            queState(moveToSismoBut);
+            break;
+
+        case moveToSismoBut:
+            if((rightEncoder.Counts() * (WHEEL_RAD * 2 * M_PI)) < distanceToTravel)
+            {
+                drive(STOP);
+                queState(interactSismoBut);
+            }
+            break;
+
+        case interactSismoBut:
+            if(!checkTouchingSide(back))
+            {
+                drive(-1*MAX);
+                while(!checkTouchingSide(back));
+                drive(STOP);
+            }
+            for(int i = 0; i < 10; i++)
+            {
+                Buzzer.Beep();
+                Sleep(0.5);
+                if(!checkTouchingSide(back))
+                {
+                    i = 0;
+                    SD.Printf("[interactSismoBut] Haven't touched button for 5 seconds, resestting\n");
+                    drive(-1*MAX);
+                    while(!checkTouchingSide(back));
+                    drive(STOP);
+                }
+            }
+            Buzzer.Buzz(5);
+            Buzzer.Buzz(5);
+            Buzzer.Buzz(5);
+            queState(startMoveCore);
+            break;
+
+        case startMoveCore:
+            driveToCoord(currentCourse.core);
+            queState(moveToCore);
+            break;
+
+        case moveToCore:
+            if((rightEncoder.Counts() * (WHEEL_RAD * 2 * M_PI)) < distanceToTravel)
+            {
+                drive(STOP);
+                queState(interactCore);
+            }
+            break;
+
+        case interactCore:
+
+            queState(startMoveDepCore);
+            break;
+
+        case startMoveDepCore:
+            driveToCoord(currentCourse.coreDepo);
+            queState(moveToDepCore);
+            break;
+
+        case moveToDepCore:
+            if((rightEncoder.Counts() * (WHEEL_RAD * 2 * M_PI)) < distanceToTravel)
+            {
+                drive(STOP);
+                queState(interactSismoBut);
+            }
+            break;
+
+        case interactDepCore:
+            if(readCdS() == RED)
+            {
+                SD.Printf("[interactDepCore] Droping core in right bin\n");
+                queState(startMoveRet);
+            }
+            else if (readCdS() == BLUE)
+            {
+                SD.Printf("[interactDepCore] Droping core in left bin\n");
+                queState(startMoveRet);
+            } else {
+                SD.Printf("[interactDepCore] Can't read light!\n");
+                Buzzer.Buzz(5);
+            }
+            break;
+
+        case startMoveRet:
+            driveToCoord(currentCourse.home);
+            queState(moveToRet);
+            break;
+
+        case moveToRet:
+            if((rightEncoder.Counts() * (WHEEL_RAD * 2 * M_PI)) < distanceToTravel)
+            {
+                drive(STOP);
+
+                rotateTo(SOUTH);
+                drive(-1*MAX);
+                while(!checkTouchingSide(back));
+                drive(STOP);
+
+                queState(shutdown);
+            }
+            break;
+
+        case shutdown:
+            SD.Printf("Course complete!");
+            runningCourse = false;
+            break;
+		default:
+			break;
+		}
+    }
 
     //Closing SD log file
     SD.Printf("Closing Log");
@@ -186,8 +310,11 @@ Course initMenu()
 
     FEHIcon::Icon MAIN[6];
     char main_label[8][20] = {"A", "B", "C", "D", "E", "F", "G", "H"};
-    FEHIcon::DrawIconArray(MAIN, 4, 2, 40, 20, 1, 1, main_label, MENU_C, TEXT_C);
+    FEHIcon::DrawIconArray(MAIN, 4, 2, 40, 51, 1, 1, main_label, MENU_C, TEXT_C);
 
+    FEHIcon::Icon MAIN_D[1];
+    char main_d_label[1][20] = {"DEBUG"};
+    FEHIcon::DrawIconArray(MAIN_D, 1, 1, 190, 20, 1, 1, main_d_label, HI_C, TEXT_C);
 
     LCD.SetFontColor(TEXT_C);
     LCD.WriteAt("BATT:        V", 0, 222);
@@ -219,8 +346,6 @@ Course initMenu()
                     LCD.Clear(BLACK);
                     LCD.WriteLine("Course   Selected");
                     LCD.WriteRC(letter, 0, 7);
-                    LCD.WriteRC(n, 0, 20);
-                    LCD.WriteRC(sqrt(4.0),0, 22);
                     SD.Printf("Selecting Course: ");
                     SD.Printf(letter);
                     SD.Printf("\n");                    
@@ -228,8 +353,47 @@ Course initMenu()
                     selectedCourse = Course(letter[0]);
 
                     noCourseSelected = false;
+
+                    queState(waitToStart);
                     break;
                 }
+            }
+            if (MAIN_D[0].Pressed(x, y, 0))
+            {
+                LCD.Clear(BLACK);
+
+                FEHIcon::Icon DEBUG[1];
+                char debug_label[1][20] = {"DEBUG MENU"};
+                FEHIcon::DrawIconArray(DEBUG, 1, 1, 1, 201, 1, 1, debug_label, HI_C, TEXT_C);
+                DEBUG[0].Select();
+
+                char debug_states[20][20] = {"WTS", "SMS", "MTS", "IWS",
+                                                 "SML", "MTL", "IWL", "SMB",
+                                                 "MTB", "IWB", "SMC", "MTC",
+                                                 "IWC", "SMD", "MTD", "IWD",
+                                                 "SMR", "MTR", "STP", "-"};
+
+                FEHIcon::Icon MAIN[20];
+                FEHIcon::DrawIconArray(MAIN, 5, 4, 40, 1, 1, 1, debug_states, MENU_C, TEXT_C);
+                do{
+                    if (LCD.Touch(&x, &y))
+                    {
+                        //Check to see if a main menu icon has been touched
+                        for (n=0; n<19; n++)
+                        {
+                            if (MAIN[n].Pressed(x, y, 0))
+                            {
+                                queState(static_cast<State>(n));
+                                noCourseSelected = false;
+                                LCD.Clear(BLACK);
+                                selectedCourse = Course('A');
+                                break;
+                            }
+                        }
+                    }
+                }while(noCourseSelected);
+
+
             }
         }
     } while(noCourseSelected);
@@ -238,12 +402,27 @@ Course initMenu()
 }
 
 /**
+ * @brief queState
+ *      Sets the state to nextState and say the state change in the log
+ * @param nextState
+ *      State being changed to
+ */
+void queState(State nextState)
+{
+    currentState = nextState;
+    SD.Printf("Queing state ");
+    SD.Printf(STATE_NAMES[nextState]);
+    SD.Printf("\n");
+}
+
+/**
  * @brief extendRetractArm
  *      Sets the satelite arm to max or min
  * @param isExtending
  *      If it is true sets it to max, otherwise set to min
  */
-void extendRetractArm(bool isExtending){
+void extendRetractArm(bool isExtending)
+{
     if(isExtending)
     {
         servoArm.SetDegree(SERVO_FULL_EXT);
@@ -252,19 +431,15 @@ void extendRetractArm(bool isExtending){
     }
 }
 
+/**
+ * @brief setForkLiftPos
+ *      Sets the forklift height based off of a percent of its max height
+ * @param percent
+ *      What percent heightwise the forklift is at
+ */
 void setForkLiftPos(float percent)
 {
     servoForkLift.SetDegree((percent/100)*(SRV_FRK_MAX-SRV_FRK_MIN) + SRV_FRK_MIN);
-}
-
-/**
- * @brief waitToStart
- *      For the beginning for the robot to wait to start
- */
-void waitToStart()
-{
-    while(readCdS() != RED){}
-    SD.Printf("\n==STARTING COURSE==\n\n");
 }
 
 /**
@@ -331,52 +506,34 @@ void drive(float mPercent)
 }
 
 /**
- * @brief driveTilHitSide
- *      Drive forward at max speed till both buttons on the side are hit
- * @param forward
- *      If the the robot is supposed to move forward
+ * @brief checkTouchingSide
  * @param side
- *      What side the robot is to hit
+ * @return
  */
-void driveTilHitSide(bool forward, ButtonSide side)
+bool checkTouchingSide(ButtonSide side)
 {
-    int direction = (forward) ? 1:-1;
-    drive(direction * MAX);
+    bool buttonsPressed = false;
+
     switch (side) {
     case front:
-        while (buttonTopLeft.Value() && buttonTopRight.Value()) {}
+        buttonsPressed = !(buttonTopLeft.Value() || buttonTopRight.Value());
         break;
     case back:
-        while (buttonBottomLeft.Value() && buttonBottomRight.Value()) {}
+        buttonsPressed = !(buttonBottomLeft.Value() || buttonBottomRight.Value());
         break;
     default:
         SD.Printf("[driveTilHitSide] ERROR: Call to non defined ButtonSide Case\n");
         break;
     }
-    drive(STOP);
+
+    return buttonsPressed;
 }
 
 /**
  * @brief turn
- *      Turn the proteus in place the specified degree to the right or left
- * @param degree
- *      How far the proteus is to turn
+ *      Turn right or left
  * @param goRight
- *      Whether or not to turn right or left
- */
-void turn(float degree, bool goRight)
-{
-    int rDirection = (goRight) ? 1:-1;
-    int lDirection = (goRight) ? -1:1;
-
-    drive(rDirection * MAX, lDirection * MAX);
-    Sleep(1);  //Fix this
-    drive(STOP);
-}
-
-/**
- * @brief turn
- * @param goRight
+ *      True to go right, false left
  */
 void turn(bool goRight)
 {
@@ -387,24 +544,21 @@ void turn(bool goRight)
 }
 
 /**
- * @brief driveToCoord
- *      The robot takes the shortest path to the given coords
- * @param x
- *      The x coordinate to go to
- * @param y
- *      The y coordinate to go to
+ * @brief rotateTo
+ *      Rotate till at given direction
+ * @param directionToHead
+ *      The degree of direction to be facing
  */
-void driveToCoord(float x, float y)
+void rotateTo(float directionToHead)
 {
-    float currHeading = RPS.Heading();
-    float currX = RPS.X(),
-          currY = RPS.Y();
+    float currHeading = RPS.Heading(),
+          leftDistance = currHeading - directionToHead,
+          rightDistance = directionToHead - currHeading;
 
-    float distanceToTravel = sqrtf(pow(x-currX, 2) + pow(y-currY, 2));
-    float directionToHead = atan2f(y-currY,x-currX) * (180.0/M_PI);
-    //Switches directions to be from 0 to 360
-    directionToHead = (directionToHead > 0.0 ? directionToHead: (360.0+directionToHead));
-    if(directionToHead < currHeading && (currHeading - directionToHead) < 180)
+    leftDistance = (leftDistance > 0.0 ? leftDistance: (360.0+leftDistance));
+    rightDistance = (rightDistance > 0.0 ? rightDistance: (360.0+rightDistance));
+
+    if(rightDistance < leftDistance)
     {
         turn(RIGHT);
         while(abs(RPS.Heading() - directionToHead) > .1){}
@@ -414,22 +568,41 @@ void driveToCoord(float x, float y)
         while(abs(RPS.Heading() - directionToHead) > .1){}
         drive(STOP);
     }
+}
+
+/**
+ * @brief driveToCoord
+ *      The robot takes the shortest path to the given coords
+ * @param pos
+ *      The coordinate to head to
+ */
+void driveToCoord(Coord pos)
+{    
+    float currX = RPS.X(),
+          currY = RPS.Y(),
+          directionToHead;
+
+    distanceToTravel = sqrtf(pow(pos.x-currX, 2) + pow(pos.y-currY, 2));
+    directionToHead = atan2f(pos.y-currY,pos.x-currX) * (180.0/M_PI);
+    //Switches directions to be from 0 to 360
+    directionToHead = (directionToHead > 0.0 ? directionToHead: (360.0+directionToHead));
+
+    rotateTo(directionToHead);
+
     rightEncoder.ResetCounts();
+    destination = pos;
 
     drive(MAX);
-    while((rightEncoder.Counts() * (WHEEL_RAD * 2 * M_PI)) < distanceToTravel){}
-    drive(STOP);
-
 }
 
 /////////////////////////////////////////////END REGION//////////////////////////////////////////
 
 
-/////////////////////////////////////REGION: Struct Definitions/////////////////////////////////////
+/////////////////////////////////////REGION: Class Definitions//////////////////////////////////////
 
 /**
  * @brief Course::Course
- *      Constructor for the Course Struct
+ *      Constructor for the Course Class
  * @param courseLet
  *      A char that is used to define which
  *      course the robot is starting on
@@ -437,9 +610,39 @@ void driveToCoord(float x, float y)
 Course::Course(char c)
 {
     courseLetter = c;
+    satelite = Coord(0,0);
+    lever = Coord(0,0);
+    seismoButton = Coord(0,0);
+    core = Coord(0,0);
+    coreDepo = Coord(0,0);
+    home = Coord(0,0);
 }
 
+/**
+ * @brief Course::Course
+ *      Empty constructor. Not to be used except for initial decleration of variable
+ */
 Course::Course(){}
+
+/**
+ * @brief Coord::Coord
+ *      Constructor for the coord class
+ * @param X
+ *      X part of the coord
+ * @param Y
+ *      Y part of the coord
+ */
+Coord::Coord(float X, float Y)
+{
+    x = X;
+    y = Y;
+}
+
+/**
+ * @brief Coord::Coord
+ *      Empty constructor. Not to be used except for initial decleration of variable
+ */
+Coord::Coord(){}
 
 /////////////////////////////////////////////END REGION/////////////////////////////////////////////
 

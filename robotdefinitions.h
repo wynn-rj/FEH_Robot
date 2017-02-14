@@ -8,6 +8,11 @@
 #define SHOW_C BLUE
 #define HI_C GREEN
 
+/* Misc Definitions */
+#ifndef M_PI
+    #define M_PI 3.14159265358979323846
+#endif
+
 /* Motor Definitions */
 #define DT_MOTOR_L FEHMotor::Motor0
 #define DT_MOTOR_R FEHMotor::Motor1
@@ -46,12 +51,50 @@
 #define RED_LIGHT 0.0
 #define BLUE_LIGHT 0.0
 
+/* Direction Definitions */
+#define NORTH 90.0
+#define EAST 0.0
+#define SOUTH 270.0
+#define WEST 180.0
+
 /* Button Combination Definitions */
 typedef enum
 {
     front,
     back
 } ButtonSide;
+
+/* Robot State Defintions */
+typedef enum
+{
+    waitToStart,
+    //Satelite
+    startMoveSat,
+    moveToSat,
+    interactSat,
+    //Lever
+    startMoveLever,
+    moveToLever,
+    interactLever,
+    //Siesmograph Button
+    startMoveSismoBut,
+    moveToSismoBut,
+    interactSismoBut,
+    //Core
+    startMoveCore,
+    moveToCore,
+    interactCore,
+    //Deposit Core
+    startMoveDepCore,
+    moveToDepCore,
+    interactDepCore,
+    //Return
+    startMoveRet,
+    moveToRet,
+
+    shutdown
+
+} State;
 
 /* Motor Turn Definitions */
 #define RIGHT true
