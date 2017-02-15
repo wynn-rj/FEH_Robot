@@ -76,6 +76,8 @@ State currentState;
 float distanceToTravel;
 Coord destination;
 
+int numberOfStateChanges = 0;
+
 const char STATE_NAMES[19][20] = {"waitToStart", "startMoveSat", "moveToSat", "interactSat",
                                  "startMoveLever", "moveToLever", "interactLever", "startMoveSismoBut",
                                  "moveToSismoBut", "interactSismoBut", "startMoveCore", "moveToCore",
@@ -110,10 +112,12 @@ int main(void)
     SD.Printf("Initializing Log\n");
 
     //Determine course robot located on
-
-    //RPS.InitializeTouchMenu();
+    if(USE_RPS)
+    {
+        RPS.InitializeTouchMenu();
+    }
     currentCourse = initMenu();
-    runningCourse = true;
+    runningCourse = RUN_STATE_MACHINE;
 
     while(runningCourse)
     {
@@ -134,7 +138,7 @@ int main(void)
             break;
         case moveToSat:
 
-            if((rightEncoder.Counts() * (WHEEL_RAD * 2 * M_PI)) < distanceToTravel)
+            if((rightEncoder.Counts() / COUNTS_PER_REV * (WHEEL_RAD * 2 * M_PI)) > distanceToTravel)
             {
                 drive(STOP);
                 queState(interactSat);
@@ -153,7 +157,7 @@ int main(void)
             break;
 
         case moveToLever:
-            if((rightEncoder.Counts() * (WHEEL_RAD * 2 * M_PI)) < distanceToTravel)
+            if(((rightEncoder.Counts() / COUNTS_PER_REV) * (WHEEL_RAD * 2 * M_PI)) > distanceToTravel)
             {
                 drive(STOP);
                 queState(interactLever);
@@ -170,7 +174,7 @@ int main(void)
             break;
 
         case moveToSismoBut:
-            if((rightEncoder.Counts() * (WHEEL_RAD * 2 * M_PI)) < distanceToTravel)
+            if((rightEncoder.Counts() / COUNTS_PER_REV * (WHEEL_RAD * 2 * M_PI)) > distanceToTravel)
             {
                 drive(STOP);
                 queState(interactSismoBut);
@@ -209,7 +213,7 @@ int main(void)
             break;
 
         case moveToCore:
-            if((rightEncoder.Counts() * (WHEEL_RAD * 2 * M_PI)) < distanceToTravel)
+            if((rightEncoder.Counts() / COUNTS_PER_REV * (WHEEL_RAD * 2 * M_PI)) > distanceToTravel)
             {
                 drive(STOP);
                 queState(interactCore);
@@ -227,7 +231,7 @@ int main(void)
             break;
 
         case moveToDepCore:
-            if((rightEncoder.Counts() * (WHEEL_RAD * 2 * M_PI)) < distanceToTravel)
+            if((rightEncoder.Counts() / COUNTS_PER_REV * (WHEEL_RAD * 2 * M_PI)) > distanceToTravel)
             {
                 drive(STOP);
                 queState(interactSismoBut);
@@ -256,7 +260,7 @@ int main(void)
             break;
 
         case moveToRet:
-            if((rightEncoder.Counts() * (WHEEL_RAD * 2 * M_PI)) < distanceToTravel)
+            if((rightEncoder.Counts() / COUNTS_PER_REV * (WHEEL_RAD * 2 * M_PI)) > distanceToTravel)
             {
                 drive(STOP);
 
@@ -270,7 +274,7 @@ int main(void)
             break;
 
         case shutdown:
-            SD.Printf("Course complete!");
+            SD.Printf("Course complete!\n");
             runningCourse = false;
             break;
 		default:
@@ -278,8 +282,9 @@ int main(void)
 		}
     }
 
+    LCD.WriteLine("Shutting down..");
     //Closing SD log file
-    SD.Printf("Closing Log");
+    SD.Printf("Closing Log\n");
     SD.CloseLog();
 
     //Ending Program
@@ -362,37 +367,64 @@ Course initMenu()
             {
                 LCD.Clear(BLACK);
 
-                FEHIcon::Icon DEBUG[1];
+                FEHIcon::Icon DEBUG_M[1];
                 char debug_label[1][20] = {"DEBUG MENU"};
-                FEHIcon::DrawIconArray(DEBUG, 1, 1, 1, 201, 1, 1, debug_label, HI_C, TEXT_C);
-                DEBUG[0].Select();
+                FEHIcon::DrawIconArray(DEBUG_M, 1, 1, 1, 201, 1, 1, debug_label, HI_C, TEXT_C);
+                DEBUG_M[0].Select();
 
                 char debug_states[20][20] = {"WTS", "SMS", "MTS", "IWS",
                                                  "SML", "MTL", "IWL", "SMB",
                                                  "MTB", "IWB", "SMC", "MTC",
                                                  "IWC", "SMD", "MTD", "IWD",
-                                                 "SMR", "MTR", "STP", "-"};
+                                                 "SMR", "MTR", "STP", "RPS"};
 
-                FEHIcon::Icon MAIN[20];
-                FEHIcon::DrawIconArray(MAIN, 5, 4, 40, 1, 1, 1, debug_states, MENU_C, TEXT_C);
+                FEHIcon::Icon DEBUG[20];
+                FEHIcon::DrawIconArray(DEBUG, 5, 4, 40, 1, 1, 1, debug_states, MENU_C, TEXT_C);
+
+                SD.Printf("Debug mode entered\n");
+
                 do{
                     if (LCD.Touch(&x, &y))
                     {
                         //Check to see if a main menu icon has been touched
-                        for (n=0; n<19; n++)
+                        for (n=0; n<20; n++)
                         {
-                            if (MAIN[n].Pressed(x, y, 0))
+                            if (DEBUG[n].Pressed(x, y, 0))
                             {
-                                queState(static_cast<State>(n));
-                                noCourseSelected = false;
-                                LCD.Clear(BLACK);
-                                selectedCourse = Course('A');
+                                if(n != 19)
+                                {
+                                    queState(static_cast<State>(n));
+                                    noCourseSelected = false;
+                                    LCD.Clear(BLACK);
+                                    selectedCourse = Course('A');
+                                } else {
+                                    SD.Printf("Reading coords");
+                                    LCD.Clear(BLACK);
+                                    LCD.WriteRC("X:",0,0);
+                                    LCD.WriteRC("Y:",1,0);
+                                    LCD.WriteRC("Head:", 2, 0);
+                                    LCD.WriteRC("Read time:", 4, 0);
+                                    Sleep(0.5);
+                                    double time, time2;
+                                    while(!LCD.Touch(&x, &y))
+                                    {
+                                        time = TimeNow();
+                                        LCD.WriteRC(RPS.X(), 0, 4);
+                                        LCD.WriteRC(RPS.Y(), 1, 4);
+                                        LCD.WriteRC(RPS.Heading(), 2, 7);
+                                        time2 = TimeNow();
+                                        LCD.WriteRC(time2-time, 4, 12);
+                                        //SD.Printf(time2-time);
+                                        //SD.Printf(" s\n");
+                                        LCD.WriteRC(" s ", 4, 23);
+                                    }
+                                }
                                 break;
                             }
                         }
                     }
                 }while(noCourseSelected);
-
+                SD.Printf("Debug mode exited\n");
 
             }
         }
@@ -410,9 +442,18 @@ Course initMenu()
 void queState(State nextState)
 {
     currentState = nextState;
+
+    numberOfStateChanges++;
+
     SD.Printf("Queing state ");
     SD.Printf(STATE_NAMES[nextState]);
     SD.Printf("\n");
+
+    if(QUIT_AFTER_ONE_STATE && numberOfStateChanges > 2)
+    {
+        currentState = shutdown;
+        SD.Printf("Debug completed, state change stopped\n");
+    }
 }
 
 /**
@@ -479,14 +520,14 @@ unsigned int readCdS()
  */
 void drive(float rMPercent, float lMPercent)
 {
-    if(rMPercent <= .05)
+    if(rMPercent == 0)
     {
         rightMotor.Stop();
     } else {
         rightMotor.SetPercent(rMPercent);
     }
 
-    if(lMPercent <= .05)
+    if(lMPercent == 0)
     {
         leftMotor.Stop();
     } else {
@@ -555,19 +596,30 @@ void rotateTo(float directionToHead)
           leftDistance = currHeading - directionToHead,
           rightDistance = directionToHead - currHeading;
 
+    while(RPS.Heading() < 0)
+    {
+        Buzzer.Buzz(5);
+    }
+
+    currHeading = RPS.Heading();
+
+    SD.Printf("At heading: %f moving to heading: %f\n", currHeading, directionToHead);
+
+
     leftDistance = (leftDistance > 0.0 ? leftDistance: (360.0+leftDistance));
     rightDistance = (rightDistance > 0.0 ? rightDistance: (360.0+rightDistance));
 
     if(rightDistance < leftDistance)
     {
         turn(RIGHT);
-        while(abs(RPS.Heading() - directionToHead) > .1){}
+        while(abs(RPS.Heading() - directionToHead) > HEAD_ERR){}
         drive(STOP);
     } else {
         turn(LEFT);
-        while(abs(RPS.Heading() - directionToHead) > .1){}
+        while(abs(RPS.Heading() - directionToHead) > HEAD_ERR){}
         drive(STOP);
     }
+    SD.Printf("Angle reached! Heading out at: %f\n", RPS.Heading());
 }
 
 /**
@@ -582,14 +634,31 @@ void driveToCoord(Coord pos)
           currY = RPS.Y(),
           directionToHead;
 
+    while(currX < 0)
+    {
+        Buzzer.Buzz(5);
+    }
+    currX = RPS.X();
+    currY = RPS.Y();
+
     distanceToTravel = sqrtf(pow(pos.x-currX, 2) + pow(pos.y-currY, 2));
     directionToHead = atan2f(pos.y-currY,pos.x-currX) * (180.0/M_PI);
     //Switches directions to be from 0 to 360
+
+    SD.Printf("At: (%f, %f) moving to (%f, %f) at calculated angle %f\n", currX, currY, pos.x, pos.y, directionToHead);
+
     directionToHead = (directionToHead > 0.0 ? directionToHead: (360.0+directionToHead));
+
+    directionToHead += DEGREE_OFFSET;
+    directionToHead = (directionToHead > 360.0 ? (directionToHead-360): (directionToHead));
+
 
     rotateTo(directionToHead);
 
+
+
     rightEncoder.ResetCounts();
+    leftEncoder.ResetCounts();
     destination = pos;
 
     drive(MAX);
@@ -610,12 +679,12 @@ void driveToCoord(Coord pos)
 Course::Course(char c)
 {
     courseLetter = c;
-    satelite = Coord(0,0);
-    lever = Coord(0,0);
-    seismoButton = Coord(0,0);
-    core = Coord(0,0);
-    coreDepo = Coord(0,0);
-    home = Coord(0,0);
+    satelite = Coord(SAT_X, SAT_Y);
+    lever = Coord(LEV_X, LEV_Y);
+    seismoButton = Coord(BUT_X, BUT_Y);
+    core = Coord(COR_X, COR_Y);
+    coreDepo = Coord(DEP_X, DEP_Y);
+    home = Coord(RET_X, RET_Y);
 }
 
 /**

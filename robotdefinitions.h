@@ -20,6 +20,7 @@
 #define DT_MOTOR_RV 12.0
 #define MTR_ENCODE_R FEHIO::P1_1
 #define MTR_ENCODE_L FEHIO::P1_2
+#define COUNTS_PER_REV 275
 
 /* Servo Definitions */
 #define SRV_ARM FEHServo::Servo0
@@ -45,7 +46,7 @@
 
 /* Motor Speed Definitions */
 #define STOP 0.0
-#define MAX 50.0
+#define MAX 25.0
 
 /* CdS Color Definitions */
 #define RED_LIGHT 0.0
@@ -99,5 +100,26 @@ typedef enum
 /* Motor Turn Definitions */
 #define RIGHT true
 #define LEFT false
+#define HEAD_ERR 2.5
+
+/* Course Coordinates */
+#define SAT_X 24
+#define SAT_Y 15
+#define LEV_X 13
+#define LEV_Y 46
+#define BUT_X 26
+#define BUT_Y 61
+#define COR_X 20
+#define COR_Y 53
+#define DEP_X 12
+#define DEP_Y 21
+#define RET_X 7
+#define RET_Y 30
+#define DEGREE_OFFSET 110.0
+
+/* Code Dev Flags */
+#define RUN_STATE_MACHINE true
+#define USE_RPS true
+#define QUIT_AFTER_ONE_STATE true
 
 #endif // ROBOTDEFINITIONS_H
