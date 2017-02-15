@@ -47,6 +47,8 @@
 /* Motor Speed Definitions */
 #define STOP 0.0
 #define MAX 25.0
+#define MAIN_TURN 25.0
+#define FINE_TURN 5.0
 
 /* CdS Color Definitions */
 #define RED_LIGHT 0.0
@@ -100,7 +102,8 @@ typedef enum
 /* Motor Turn Definitions */
 #define RIGHT true
 #define LEFT false
-#define HEAD_ERR 2.5
+#define HEAD_ERR 5.0
+#define HEAD_ERR_FINE 1.0
 
 /* Course Coordinates */
 #define SAT_X 24

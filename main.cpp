@@ -47,9 +47,10 @@ unsigned int readCdS();
 void drive(float, float);
 void drive(float);
 bool checkTouchingSide(ButtonSide);
-void turn(bool);
+void turn(bool, float);
 void rotateTo(float);
 void driveToCoord(Coord);
+bool verifyStartConditions();
 
 
 /* Global Variable Decleration */
@@ -103,9 +104,12 @@ int main(void)
     //Set Servo Values
     servoArm.SetMax(SRV_MAX);
     servoArm.SetMin(SRV_MIN);
+    servoArm.SetDegree(SERVO_NO_EXT);
 
     servoForkLift.SetMax(SRV_FRK_MAX);
     servoForkLift.SetMin(SRV_FRK_MIN);
+    servoArm.SetDegree(SRV_FRK_NO_EXT);
+
 
     //Starting SD log file
     SD.OpenLog();
@@ -116,6 +120,12 @@ int main(void)
     {
         RPS.InitializeTouchMenu();
     }
+
+    while(!verifyStartConditions())
+    {
+        Buzzer.Buzz(5);
+    }
+
     currentCourse = initMenu();
     runningCourse = RUN_STATE_MACHINE;
 
@@ -177,6 +187,7 @@ int main(void)
             if((rightEncoder.Counts() / COUNTS_PER_REV * (WHEEL_RAD * 2 * M_PI)) > distanceToTravel)
             {
                 drive(STOP);
+                rotateTo(SOUTH);
                 queState(interactSismoBut);
             }
             break;
@@ -201,9 +212,8 @@ int main(void)
                     drive(STOP);
                 }
             }
-            Buzzer.Buzz(5);
-            Buzzer.Buzz(5);
-            Buzzer.Buzz(5);
+            LCD.SetBackgroundColor(RED);
+            LCD.SetBackgroundColor(BLACK);
             queState(startMoveCore);
             break;
 
@@ -576,12 +586,12 @@ bool checkTouchingSide(ButtonSide side)
  * @param goRight
  *      True to go right, false left
  */
-void turn(bool goRight)
+void turn(bool goRight, float speed)
 {
     int rDirection = (goRight) ? 1:-1;
     int lDirection = (goRight) ? -1:1;
 
-    drive(rDirection * MAX, lDirection * MAX);
+    drive(rDirection * speed, lDirection * speed);
 }
 
 /**
@@ -595,6 +605,7 @@ void rotateTo(float directionToHead)
     float currHeading = RPS.Heading(),
           leftDistance = currHeading - directionToHead,
           rightDistance = directionToHead - currHeading;
+    bool turnDirection;
 
     while(RPS.Heading() < 0)
     {
@@ -611,14 +622,19 @@ void rotateTo(float directionToHead)
 
     if(rightDistance < leftDistance)
     {
-        turn(RIGHT);
-        while(abs(RPS.Heading() - directionToHead) > HEAD_ERR){}
-        drive(STOP);
+        turnDirection = RIGHT;
+
     } else {
-        turn(LEFT);
-        while(abs(RPS.Heading() - directionToHead) > HEAD_ERR){}
-        drive(STOP);
+        turnDirection = LEFT;
     }
+
+    turn(turnDirection, MAIN_TURN);
+    while(abs(RPS.Heading() - directionToHead) > HEAD_ERR){}
+    drive(STOP);
+    turn(turnDirection, FINE_TURN);
+    while(abs(RPS.Heading() - directionToHead) > HEAD_ERR_FINE){}
+    drive(STOP);
+
     SD.Printf("Angle reached! Heading out at: %f\n", RPS.Heading());
 }
 
@@ -655,8 +671,13 @@ void driveToCoord(Coord pos)
 
     rotateTo(directionToHead);
 
+    //Verify that during turn RPS Coords didn't change
+    currX = RPS.X();
+    currY = RPS.Y();
 
+    distanceToTravel = sqrtf(pow(pos.x-currX, 2) + pow(pos.y-currY, 2));
 
+    //Reset encoders for travel
     rightEncoder.ResetCounts();
     leftEncoder.ResetCounts();
     destination = pos;
@@ -665,6 +686,38 @@ void driveToCoord(Coord pos)
 }
 
 /////////////////////////////////////////////END REGION//////////////////////////////////////////
+
+bool verifyStartConditions()
+{
+    bool flag = true;
+    if(!buttonBottomLeft.Value())
+    {
+        LCD.WriteRC("BOTTOM LEFT ACTIVATED", 0, 0);
+        flag = false;
+    }
+    if(!buttonBottomRight.Value())
+    {
+        LCD.WriteRC("BOTTOM RIGHT ACTIVATED", 1, 0);
+        flag = false;
+    }
+    if(!buttonTopLeft.Value())
+    {
+        LCD.WriteRC("BOTTOM LEFT ACTIVATED", 2, 0);
+        flag = false;
+    }
+    if(!buttonTopRight.Value())
+    {
+        LCD.WriteRC("BOTTOM LEFT ACTIVATED", 3, 0);
+        flag = false;
+    }
+    if(readCdS() != BLACK)
+    {
+        LCD.WriteRC("CDS NOT READING BLACK", 4, 0);
+        flag = false;
+    }
+
+    return flag;
+}
 
 
 /////////////////////////////////////REGION: Class Definitions//////////////////////////////////////
