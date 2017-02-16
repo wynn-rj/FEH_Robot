@@ -9,7 +9,7 @@
 #include <FEHRPS.h>
 #include <robotdefinitions.h>
 #include <math.h>
-
+#include <string.h>
 
 
 /////////////////////////////////////REGION: Declerations/////////////////////////////////////
@@ -39,54 +39,91 @@ private:
 
 /* Function declerations */
 
+void initialSetup();
 Course initMenu();
 void queState(State);
 void extendRetractArm(bool);
 void setForkLiftPos(float);
 unsigned int readCdS();
+bool verifyStartConditions();
+void drawRunningScreen();
+bool drivedDistance();
+
+//Drive functions
 void drive(float, float);
 void drive(float);
 bool checkTouchingSide(ButtonSide);
 void turn(bool, float);
 void rotateTo(float);
 void driveToCoord(Coord);
-bool verifyStartConditions();
+void PIDCheck();
+
 
 
 /* Global Variable Decleration */
 
+//Motors
 FEHMotor leftMotor(DT_MOTOR_L, DT_MOTOR_LV);
 FEHMotor rightMotor(DT_MOTOR_R, DT_MOTOR_RV);
 
+//Motor encoders
 DigitalEncoder rightEncoder(MTR_ENCODE_R);
 DigitalEncoder leftEncoder(MTR_ENCODE_L);
 
+//Servos
 FEHServo servoArm(SRV_ARM);
 FEHServo servoForkLift(SRV_FRK_LFT);
 
+//Corner bumb buttons
 DigitalInputPin buttonTopLeft(BUTTON_TOP_LEFT);
 DigitalInputPin buttonTopRight(BUTTON_TOP_RIGHT);
 DigitalInputPin buttonBottomLeft(BUTTON_BOTTOM_LEFT);
 DigitalInputPin buttonBottomRight(BUTTON_BOTTOM_RIGHT);
 
+//CdS Cell
 AnalogInputPin CdS(CDS_CELL);
 
-bool runningCourse;
-State currentState;
-
-float distanceToTravel;
-Coord destination;
-
-int numberOfStateChanges = 0;
-
+//Text representation of all of the states
 const char STATE_NAMES[19][20] = {"waitToStart", "startMoveSat", "moveToSat", "interactSat",
                                  "startMoveLever", "moveToLever", "interactLever", "startMoveSismoBut",
                                  "moveToSismoBut", "interactSismoBut", "startMoveCore", "moveToCore",
                                  "interactCore", "startMoveDepCore", "moveToDepCore", "interactDepCore",
                                  "startMoveRet", "moveToRet", "shutdown"};
 
+//If the course is being run by the robot. i.e. if it is in the state machine
+bool runningCourse;
+
+//The current state of the state machine the robot is in
+State currentState;
+
+//How far the robot is to travel before next state
+float distanceToTravel;
+
+//The destination the robot is heading towards
+Coord destination;
+
+//Whether or not the robot is driving straight and should be using PID correction
+bool enablePID;
+
+//The speeds that each motor are set at
+float rightMotorSpeed,
+      leftMotorSpeed;
+
+//The percentage the servos are set at
+float servoFrkPer,
+      servoArmPer;
+
+//How many state changes the robot has gone through
+int numberOfStateChanges;
+
+//Message displayed on the Running Screen
+char screenMessage[20];
+
+//The course the robot is running on
+Course currentCourse;
 
 //////////////////////////////////////////END REGION//////////////////////////////////////////
+
 
 /**
  * @brief main
@@ -95,42 +132,20 @@ const char STATE_NAMES[19][20] = {"waitToStart", "startMoveSat", "moveToSat", "i
  */
 int main(void)
 {
-    Course currentCourse;
-
-    //CLears the LCD of anything previously on it
-    LCD.Clear(FEHLCD::Black);
-    LCD.SetFontColor(FEHLCD::White);
-
-    //Set Servo Values
-    servoArm.SetMax(SRV_MAX);
-    servoArm.SetMin(SRV_MIN);
-    servoArm.SetDegree(SERVO_NO_EXT);
-
-    servoForkLift.SetMax(SRV_FRK_MAX);
-    servoForkLift.SetMin(SRV_FRK_MIN);
-    servoArm.SetDegree(SRV_FRK_NO_EXT);
-
-
-    //Starting SD log file
-    SD.OpenLog();
-    SD.Printf("Initializing Log\n");
-
-    //Determine course robot located on
-    if(USE_RPS)
-    {
-        RPS.InitializeTouchMenu();
-    }
-
-    while(!verifyStartConditions())
-    {
-        Buzzer.Buzz(5);
-    }
-
-    currentCourse = initMenu();
-    runningCourse = RUN_STATE_MACHINE;
+    initialSetup();
 
     while(runningCourse)
     {
+        //If trying to drive straight verify actually driving straight
+        if(enablePID)
+        {
+            PIDCheck();
+        }
+
+        //Draw the running screen for hardware verification
+        drawRunningScreen();
+
+        //Loop through state machine
 		switch (currentState)
 		{
         case waitToStart:
@@ -146,9 +161,9 @@ int main(void)
             queState(moveToSat);
             extendRetractArm(true);
             break;
-        case moveToSat:
 
-            if((rightEncoder.Counts() / COUNTS_PER_REV * (WHEEL_RAD * 2 * M_PI)) > distanceToTravel)
+        case moveToSat:
+            if(drivedDistance())
             {
                 drive(STOP);
                 queState(interactSat);
@@ -156,7 +171,6 @@ int main(void)
             break;
 
         case interactSat:
-
             queState(startMoveLever);
             extendRetractArm(true);
             break;
@@ -167,7 +181,7 @@ int main(void)
             break;
 
         case moveToLever:
-            if(((rightEncoder.Counts() / COUNTS_PER_REV) * (WHEEL_RAD * 2 * M_PI)) > distanceToTravel)
+            if(drivedDistance())
             {
                 drive(STOP);
                 queState(interactLever);
@@ -175,16 +189,16 @@ int main(void)
             break;
 
         case interactLever:
-
             queState(startMoveSismoBut);
             break;
+
         case startMoveSismoBut:
             driveToCoord(currentCourse.seismoButton);
             queState(moveToSismoBut);
             break;
 
         case moveToSismoBut:
-            if((rightEncoder.Counts() / COUNTS_PER_REV * (WHEEL_RAD * 2 * M_PI)) > distanceToTravel)
+            if(drivedDistance())
             {
                 drive(STOP);
                 rotateTo(SOUTH);
@@ -223,7 +237,7 @@ int main(void)
             break;
 
         case moveToCore:
-            if((rightEncoder.Counts() / COUNTS_PER_REV * (WHEEL_RAD * 2 * M_PI)) > distanceToTravel)
+            if(drivedDistance())
             {
                 drive(STOP);
                 queState(interactCore);
@@ -231,7 +245,6 @@ int main(void)
             break;
 
         case interactCore:
-
             queState(startMoveDepCore);
             break;
 
@@ -241,7 +254,7 @@ int main(void)
             break;
 
         case moveToDepCore:
-            if((rightEncoder.Counts() / COUNTS_PER_REV * (WHEEL_RAD * 2 * M_PI)) > distanceToTravel)
+            if(drivedDistance())
             {
                 drive(STOP);
                 queState(interactSismoBut);
@@ -270,7 +283,7 @@ int main(void)
             break;
 
         case moveToRet:
-            if((rightEncoder.Counts() / COUNTS_PER_REV * (WHEEL_RAD * 2 * M_PI)) > distanceToTravel)
+            if(drivedDistance())
             {
                 drive(STOP);
 
@@ -287,11 +300,14 @@ int main(void)
             SD.Printf("Course complete!\n");
             runningCourse = false;
             break;
+
 		default:
+            SD.Printf("DEFAULT ENCOUNTERED IN STATE!\n");
 			break;
 		}
     }
 
+    LCD.Clear(BLACK);
     LCD.WriteLine("Shutting down..");
     //Closing SD log file
     SD.Printf("Closing Log\n");
@@ -299,6 +315,51 @@ int main(void)
 
     //Ending Program
     return 0;
+}
+
+/**
+ * @brief initialSetup
+ *      Sets initial values and settings
+ */
+void initialSetup()
+{
+    //CLears the LCD of anything previously on it
+    LCD.Clear(FEHLCD::Black);
+    LCD.SetFontColor(FEHLCD::White);
+
+    //Set Servo Values
+    servoArm.SetMax(SRV_MAX);
+    servoArm.SetMin(SRV_MIN);
+    servoArm.SetDegree(SERVO_NO_EXT);
+
+    servoForkLift.SetMax(SRV_FRK_MAX);
+    servoForkLift.SetMin(SRV_FRK_MIN);
+    servoArm.SetDegree(SRV_FRK_NO_EXT);
+
+    //Sets initial global variable values
+    rightMotorSpeed = leftMotorSpeed = 0;
+    numberOfStateChanges = 0;
+    enablePID = false;
+    strcpy(screenMessage,"INIT");
+
+    //Starting SD log file
+    SD.OpenLog();
+    SD.Printf("Initializing Log\n");
+
+    //Determine course robot located on
+    if(USE_RPS)
+    {
+        RPS.InitializeTouchMenu();
+    }
+
+    while(INIT_CHECK && !verifyStartConditions())
+    {
+        Buzzer.Buzz(5);
+    }
+
+    //Gets if running course and what course it is on
+    runningCourse = RUN_STATE_MACHINE;
+    currentCourse = initMenu();
 }
 
 /**
@@ -312,24 +373,24 @@ Course initMenu()
     bool noCourseSelected = true;
     int n;
     float x, y;
-    float m = 0, bat_v = 0;
+    float m = 0, batteryVoltage = 0;
     Course selectedCourse;
 
     LCD.Clear(BLACK);
 
     //Create icons for main menu
-    FEHIcon::Icon MAIN_T[1];
-    char main_t_label[1][20] = {"LIBERTATUM VOLCANUS"};
-    FEHIcon::DrawIconArray(MAIN_T, 1, 1, 1, 201, 1, 1, main_t_label, HI_C, TEXT_C);
-    MAIN_T[0].Select();
+    FEHIcon::Icon iconMainT[1];
+    char mainTLabel[1][20] = {"LIBERTATUM VOLCANUS"};
+    FEHIcon::DrawIconArray(iconMainT, 1, 1, 1, 201, 1, 1, mainTLabel, HI_C, TEXT_C);
+    iconMainT[0].Select();
 
-    FEHIcon::Icon MAIN[6];
-    char main_label[8][20] = {"A", "B", "C", "D", "E", "F", "G", "H"};
-    FEHIcon::DrawIconArray(MAIN, 4, 2, 40, 51, 1, 1, main_label, MENU_C, TEXT_C);
+    FEHIcon::Icon iconMain[6];
+    char mainLabel[8][20] = {"A", "B", "C", "D", "E", "F", "G", "H"};
+    FEHIcon::DrawIconArray(iconMain, 4, 2, 40, 51, 1, 1, mainLabel, MENU_C, TEXT_C);
 
-    FEHIcon::Icon MAIN_D[1];
-    char main_d_label[1][20] = {"DEBUG"};
-    FEHIcon::DrawIconArray(MAIN_D, 1, 1, 190, 20, 1, 1, main_d_label, HI_C, TEXT_C);
+    FEHIcon::Icon iconMainD[1];
+    char mainDLabel[1][20] = {"DEBUG"};
+    FEHIcon::DrawIconArray(iconMainD, 1, 1, 190, 20, 1, 1, mainDLabel, HI_C, TEXT_C);
 
     LCD.SetFontColor(TEXT_C);
     LCD.WriteAt("BATT:        V", 0, 222);
@@ -337,10 +398,10 @@ Course initMenu()
     do
     {
         //Display average battery voltage to screen
-        bat_v = ((bat_v*m)+Battery.Voltage());
-        bat_v = bat_v/(++m);
-        LCD.WriteAt(bat_v, 72, 222);
-        if(bat_v < 10)
+        batteryVoltage = ((batteryVoltage*m)+Battery.Voltage());
+        batteryVoltage = batteryVoltage/(++m);
+        LCD.WriteAt(batteryVoltage, 72, 222);
+        if(batteryVoltage < 10)
         {
             Buzzer.Buzz(10);
         }
@@ -349,9 +410,9 @@ Course initMenu()
             //Check to see if a main menu icon has been touched
             for (n=0; n<=7; n++)
             {
-                if (MAIN[n].Pressed(x, y, 0))
+                if (iconMain[n].Pressed(x, y, 0))
                 {
-                    char letter[2] = {main_label[n][0], ' '};
+                    char letter[2] = {mainLabel[n][0], ' '};
                     if (n == 0)
                         letter[0] = 'A';
                     if (n == 1)
@@ -373,23 +434,23 @@ Course initMenu()
                     break;
                 }
             }
-            if (MAIN_D[0].Pressed(x, y, 0))
+            if (iconMainD[0].Pressed(x, y, 0))
             {
                 LCD.Clear(BLACK);
 
-                FEHIcon::Icon DEBUG_M[1];
-                char debug_label[1][20] = {"DEBUG MENU"};
-                FEHIcon::DrawIconArray(DEBUG_M, 1, 1, 1, 201, 1, 1, debug_label, HI_C, TEXT_C);
-                DEBUG_M[0].Select();
+                FEHIcon::Icon iconDebugM[1];
+                char debugLabel[1][20] = {"DEBUG MENU"};
+                FEHIcon::DrawIconArray(iconDebugM, 1, 1, 1, 201, 1, 1, debugLabel, HI_C, TEXT_C);
+                iconDebugM[0].Select();
 
-                char debug_states[20][20] = {"WTS", "SMS", "MTS", "IWS",
+                char debugStates[20][20] = {"WTS", "SMS", "MTS", "IWS",
                                                  "SML", "MTL", "IWL", "SMB",
                                                  "MTB", "IWB", "SMC", "MTC",
                                                  "IWC", "SMD", "MTD", "IWD",
                                                  "SMR", "MTR", "STP", "RPS"};
 
-                FEHIcon::Icon DEBUG[20];
-                FEHIcon::DrawIconArray(DEBUG, 5, 4, 40, 1, 1, 1, debug_states, MENU_C, TEXT_C);
+                FEHIcon::Icon iconDebug[20];
+                FEHIcon::DrawIconArray(iconDebug, 5, 4, 40, 1, 1, 1, debugStates, MENU_C, TEXT_C);
 
                 SD.Printf("Debug mode entered\n");
 
@@ -399,7 +460,7 @@ Course initMenu()
                         //Check to see if a main menu icon has been touched
                         for (n=0; n<20; n++)
                         {
-                            if (DEBUG[n].Pressed(x, y, 0))
+                            if (iconDebug[n].Pressed(x, y, 0))
                             {
                                 if(n != 19)
                                 {
@@ -428,6 +489,8 @@ Course initMenu()
                                         //SD.Printf(" s\n");
                                         LCD.WriteRC(" s ", 4, 23);
                                     }
+                                    noCourseSelected = false;
+                                    runningCourse = false;
                                 }
                                 break;
                             }
@@ -459,6 +522,8 @@ void queState(State nextState)
     SD.Printf(STATE_NAMES[nextState]);
     SD.Printf("\n");
 
+    strcpy(screenMessage, STATE_NAMES[nextState]);
+
     if(QUIT_AFTER_ONE_STATE && numberOfStateChanges > 2)
     {
         currentState = shutdown;
@@ -477,9 +542,13 @@ void extendRetractArm(bool isExtending)
     if(isExtending)
     {
         servoArm.SetDegree(SERVO_FULL_EXT);
+        servoArmPer = SERVO_FULL_EXT;
     } else {
         servoArm.SetDegree(SERVO_NO_EXT);
+        servoArmPer = SERVO_NO_EXT;
     }
+
+
 }
 
 /**
@@ -490,7 +559,8 @@ void extendRetractArm(bool isExtending)
  */
 void setForkLiftPos(float percent)
 {
-    servoForkLift.SetDegree((percent/100)*(SRV_FRK_MAX-SRV_FRK_MIN) + SRV_FRK_MIN);
+    servoFrkPer = (percent/100)*(SRV_FRK_MAX-SRV_FRK_MIN) + SRV_FRK_MIN;
+    servoForkLift.SetDegree(servoFrkPer);
 }
 
 /**
@@ -517,8 +587,121 @@ unsigned int readCdS()
     return retColor;
 }
 
-/////////////////////////////////////REGION: Drive Functions/////////////////////////////////////
+/**
+ * @brief verifyStartConditions
+ *      checks if the start conditions for the robot are what are expected
+ * @return
+ *      if start conditions are good
+ */
+bool verifyStartConditions()
+{
+    bool flag = true;
+    if(!buttonBottomLeft.Value())
+    {
+        LCD.WriteRC("BOTTOM LEFT ACTIVATED", 0, 0);
+        flag = false;
+    }
+    if(!buttonBottomRight.Value())
+    {
+        LCD.WriteRC("BOTTOM RIGHT ACTIVATED", 1, 0);
+        flag = false;
+    }
+    if(!buttonTopLeft.Value())
+    {
+        LCD.WriteRC("BOTTOM LEFT ACTIVATED", 2, 0);
+        flag = false;
+    }
+    if(!buttonTopRight.Value())
+    {
+        LCD.WriteRC("BOTTOM LEFT ACTIVATED", 3, 0);
+        flag = false;
+    }
+    if(readCdS() != BLACK)
+    {
+        LCD.WriteRC("CDS NOT READING BLACK", 4, 0);
+        flag = false;
+    }
 
+    return flag;
+}
+
+/**
+ * @brief drawRunningScreen
+ *      draws information on the screen to visually see if hardware
+ *      and software are interacting correctly
+ */
+void drawRunningScreen()
+{
+    if(!buttonBottomLeft.Value())
+    {
+        LCD.SetFontColor(SCARLET);
+    } else {
+        LCD.SetFontColor(DARKGRAY);
+    }
+    LCD.FillCircle(15, 220, 10);
+    if(!buttonBottomRight.Value())
+    {
+        LCD.SetFontColor(SCARLET);
+    } else {
+        LCD.SetFontColor(DARKGRAY);
+    }
+    LCD.FillCircle(305, 220, 10);
+    if(!buttonTopLeft.Value())
+    {
+        LCD.SetFontColor(SCARLET);
+    } else {
+        LCD.SetFontColor(DARKGRAY);
+    }
+    LCD.FillCircle(15, 10, 10);
+    if(!buttonTopRight.Value())
+    {
+        LCD.SetFontColor(SCARLET);
+    } else {
+        LCD.SetFontColor(DARKGRAY);
+    }
+    LCD.FillCircle(305, 10, 10);
+
+    LCD.SetFontColor(WHITE);
+
+    LCD.WriteRC(" RPS (     ,     ) @     ", 3, 0);
+    LCD.WriteRC(" DRS ( NOT , IN  ) @ USE ", 4, 0);
+
+    LCD.WriteRC((int)RPS.X(), 3, 7);
+    LCD.WriteRC((int)RPS.Y(), 3, 13);
+    LCD.WriteRC(((int)RPS.Heading()), 3, 21);
+
+    LCD.WriteRC(" RM:           RE: ", 5, 0);
+    LCD.WriteRC(rightMotorSpeed, 5, 5);
+    LCD.WriteRC(rightEncoder.Counts(), 5, 18);
+
+    LCD.WriteRC(" LM:           LE: ", 6, 0);
+    LCD.WriteRC(leftMotorSpeed, 6, 5);
+    LCD.WriteRC(leftEncoder.Counts(), 6, 18);
+
+    LCD.WriteRC(" FRK:              ", 7, 0);
+    LCD.WriteRC(servoFrkPer, 7, 6);
+
+    LCD.WriteRC(" ARM:              ", 8, 0);
+    LCD.WriteRC(servoArmPer, 8, 6);
+
+    LCD.WriteRC(" ST:               ", 9, 0);
+    LCD.WriteRC(screenMessage, 9, 5);
+
+}
+
+/**
+ * @brief drivedDistance
+ *      Checks if the robot has traveled the qued distance
+ * @returns
+ *      If the robot has traveled the specified distance
+ */
+bool drivedDistance()
+{
+    return ((rightEncoder.Counts() / COUNTS_PER_REV) * (WHEEL_RAD * 2 * M_PI)) > distanceToTravel;
+}
+
+
+/////////////////////////////////////REGION: Drive Functions/////////////////////////////////////
 
 /**
  * @brief drive
@@ -543,6 +726,9 @@ void drive(float rMPercent, float lMPercent)
     } else {
         leftMotor.SetPercent(lMPercent);
     }
+
+    rightMotorSpeed = rMPercent;
+    leftMotorSpeed = lMPercent;
 }
 
 /**
@@ -610,9 +796,10 @@ void rotateTo(float directionToHead)
     while(RPS.Heading() < 0)
     {
         Buzzer.Buzz(5);
+        currHeading = RPS.Heading();
     }
 
-    currHeading = RPS.Heading();
+
 
     SD.Printf("At heading: %f moving to heading: %f\n", currHeading, directionToHead);
 
@@ -653,6 +840,7 @@ void driveToCoord(Coord pos)
     while(currX < 0)
     {
         Buzzer.Buzz(5);
+        currX = RPS.X();
     }
     currX = RPS.X();
     currY = RPS.Y();
@@ -685,39 +873,12 @@ void driveToCoord(Coord pos)
     drive(MAX);
 }
 
-/////////////////////////////////////////////END REGION//////////////////////////////////////////
-
-bool verifyStartConditions()
+void PIDCheck()
 {
-    bool flag = true;
-    if(!buttonBottomLeft.Value())
-    {
-        LCD.WriteRC("BOTTOM LEFT ACTIVATED", 0, 0);
-        flag = false;
-    }
-    if(!buttonBottomRight.Value())
-    {
-        LCD.WriteRC("BOTTOM RIGHT ACTIVATED", 1, 0);
-        flag = false;
-    }
-    if(!buttonTopLeft.Value())
-    {
-        LCD.WriteRC("BOTTOM LEFT ACTIVATED", 2, 0);
-        flag = false;
-    }
-    if(!buttonTopRight.Value())
-    {
-        LCD.WriteRC("BOTTOM LEFT ACTIVATED", 3, 0);
-        flag = false;
-    }
-    if(readCdS() != BLACK)
-    {
-        LCD.WriteRC("CDS NOT READING BLACK", 4, 0);
-        flag = false;
-    }
 
-    return flag;
 }
+
+/////////////////////////////////////////////END REGION//////////////////////////////////////////
 
 
 /////////////////////////////////////REGION: Class Definitions//////////////////////////////////////

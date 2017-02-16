@@ -20,7 +20,7 @@
 #define DT_MOTOR_RV 12.0
 #define MTR_ENCODE_R FEHIO::P1_1
 #define MTR_ENCODE_L FEHIO::P1_2
-#define COUNTS_PER_REV 275
+#define COUNTS_PER_REV 318
 
 /* Servo Definitions */
 #define SRV_ARM FEHServo::Servo0
@@ -106,23 +106,24 @@ typedef enum
 #define HEAD_ERR_FINE 1.0
 
 /* Course Coordinates */
-#define SAT_X 24
-#define SAT_Y 15
-#define LEV_X 13
-#define LEV_Y 46
-#define BUT_X 26
-#define BUT_Y 61
-#define COR_X 20
-#define COR_Y 53
-#define DEP_X 12
-#define DEP_Y 21
-#define RET_X 7
-#define RET_Y 30
-#define DEGREE_OFFSET 110.0
+#define SAT_X 29.5
+#define SAT_Y 15.0
+#define LEV_X 12.0
+#define LEV_Y 45.0
+#define BUT_X 25.0
+#define BUT_Y 61.0
+#define COR_X 18.5
+#define COR_Y 54.0
+#define DEP_X 12.0
+#define DEP_Y 15.5
+#define RET_X 6.0
+#define RET_Y 27.0
+#define DEGREE_OFFSET 0.0
 
 /* Code Dev Flags */
 #define RUN_STATE_MACHINE true
 #define USE_RPS true
 #define QUIT_AFTER_ONE_STATE true
+#define INIT_CHECK false
 
 #endif // ROBOTDEFINITIONS_H
