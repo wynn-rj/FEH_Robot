@@ -54,10 +54,13 @@ void drive(float, float);
 void drive(float);
 bool checkTouchingSide(ButtonSide);
 void turn(bool, float);
+void turnBlind(bool, float, float);
 void rotateTo(float);
 void driveToCoord(Coord);
 void PIDCheck();
-
+void followLine();
+int leftCountOffset();
+int rightCountOffset();
 
 
 /* Global Variable Decleration */
@@ -82,6 +85,11 @@ DigitalInputPin buttonBottomRight(BUTTON_BOTTOM_RIGHT);
 
 //CdS Cell
 AnalogInputPin CdS(CDS_CELL);
+
+//Optosensors
+AnalogInputPin rightOpt(FEHIO::P1_0);
+AnalogInputPin middleOpt(FEHIO::P1_1);
+AnalogInputPin leftOpt(FEHIO::P1_2);
 
 //Text representation of all of the states
 const char STATE_NAMES[19][20] = {"waitToStart", "startMoveSat", "moveToSat", "interactSat",
@@ -245,7 +253,40 @@ int main(void)
             break;
 
         case interactCore:
-            queState(startMoveDepCore);
+            /*
+            leftEncoder.ResetCounts();
+            rightEncoder.ResetCounts();
+            distanceToTravel = 14;
+            drive(MAX);
+            while(!drivedDistance());
+            drive(STOP);
+
+            turnBlind(!LEFT, 90, MAIN_TURN);
+
+            leftEncoder.ResetCounts();
+            rightEncoder.ResetCounts();
+            distanceToTravel = 10;
+            drive(MAX);
+            while(!drivedDistance());
+            drive(STOP);
+
+            turnBlind(!RIGHT, 95, MAIN_TURN);
+
+            leftEncoder.ResetCounts();
+            rightEncoder.ResetCounts();
+            distanceToTravel = 4;
+            drive(MAX);
+            while(!drivedDistance());
+            drive(STOP);
+
+            queState(shutdown);
+            */
+            float x,
+                  y;
+
+            drive(MAX);
+            while(!LCD.Touch(&x, &y));
+            drive(STOP);
             break;
 
         case startMoveDepCore:
@@ -476,6 +517,9 @@ Course initMenu()
                                     LCD.WriteRC("Head:", 2, 0);
                                     LCD.WriteRC("Read time:", 4, 0);
                                     Sleep(0.5);
+                                    LCD.WriteRC("LOPT: ",6,0);
+                                    LCD.WriteRC("MOPT: ",7,0);
+                                    LCD.WriteRC("ROPT: ",8,0);
                                     double time, time2;
                                     while(!LCD.Touch(&x, &y))
                                     {
@@ -488,6 +532,9 @@ Course initMenu()
                                         //SD.Printf(time2-time);
                                         //SD.Printf(" s\n");
                                         LCD.WriteRC(" s ", 4, 23);
+                                        LCD.WriteRC(leftOpt.Value(), 6, 6);
+                                        LCD.WriteRC(middleOpt.Value(), 7, 6);
+                                        LCD.WriteRC(rightOpt.Value(), 8, 6);
                                     }
                                     noCourseSelected = false;
                                     runningCourse = false;
@@ -697,7 +744,9 @@ void drawRunningScreen()
  */
 bool drivedDistance()
 {
-    return ((rightEncoder.Counts() / COUNTS_PER_REV) * (WHEEL_RAD * 2 * M_PI)) > distanceToTravel;
+    return ((((rightEncoder.Counts()+rightCountOffset() + leftEncoder.Counts()+leftCountOffset()) /2)
+             / COUNTS_PER_REV)
+                * (WHEEL_RAD * 2 * M_PI)) > distanceToTravel;
 }
 
 
@@ -724,7 +773,8 @@ void drive(float rMPercent, float lMPercent)
     {
         leftMotor.Stop();
     } else {
-        leftMotor.SetPercent(lMPercent);
+        //The negative adjusts for the motor being mounted backwards
+        leftMotor.SetPercent(-1*lMPercent);
     }
 
     rightMotorSpeed = rMPercent;
@@ -778,6 +828,19 @@ void turn(bool goRight, float speed)
     int lDirection = (goRight) ? -1:1;
 
     drive(rDirection * speed, lDirection * speed);
+}
+
+void turnBlind(bool goRight, float degree, float speed)
+{
+    leftEncoder.ResetCounts();
+    rightEncoder.ResetCounts();
+
+    float wheelSeperationRad = 3.5;
+
+    turn(goRight, speed);
+    while(((leftEncoder.Counts() + rightEncoder.Counts() + leftCountOffset())/2 * ((WHEEL_RAD * 2 * M_PI) /COUNTS_PER_REV))
+          < (degree * M_PI / 180 * wheelSeperationRad));
+    drive(STOP);
 }
 
 /**
@@ -876,6 +939,83 @@ void driveToCoord(Coord pos)
 void PIDCheck()
 {
 
+}
+
+void followLine()
+{
+
+    typedef enum {
+        onLine,
+        leftOfLine,
+        rightOfLine
+    } lineFollowing;
+
+    float rightVal, middleVal, leftVal;
+
+    lineFollowing posistion;
+
+    const float LINE_COLOR = 1.5;
+\
+    rightEncoder.ResetCounts();
+    leftEncoder.ResetCounts();
+    distanceToTravel = 50;
+
+    while(!drivedDistance())
+    {
+        rightVal = rightOpt.Value();
+        middleVal = middleOpt.Value();
+        leftVal = leftOpt.Value();
+
+        if(middleVal > LINE_COLOR)
+        {
+            posistion = onLine;
+        }
+
+        if(rightVal > LINE_COLOR)
+        {
+            posistion = rightOfLine;
+        }
+
+        if(leftVal > LINE_COLOR)
+        {
+            posistion = leftOfLine;
+        }
+
+        switch (posistion) {
+        case onLine:
+            drive(LINE_FOLLOW_STRAIGHT);
+            break;
+
+        case rightOfLine:
+            drive(0.25 * LINE_FOLLOW, LINE_FOLLOW);
+            break;
+
+        case leftOfLine:
+            drive(LINE_FOLLOW, 0.25 * LINE_FOLLOW);
+            break;
+
+        default:
+            break;
+        }
+    }
+    drive(STOP);
+}
+
+int leftCountOffset()
+{
+    float x = abs(leftMotorSpeed);
+    //int ans = (int)(0.006143*x*x + .3007*x -2.757);
+    int ans = (int)(0.006143*x*x + x -2.757);
+    ans = (ans < 0) ? 0:ans;
+    return ans;
+}
+
+int rightCountOffset()
+{
+    float x = abs(rightMotorSpeed);
+    int ans = (int)(0.006143*x*x + x -2.757);
+    ans = (ans < 0) ? 0:ans;
+    return ans;
 }
 
 /////////////////////////////////////////////END REGION//////////////////////////////////////////

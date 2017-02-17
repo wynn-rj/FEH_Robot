@@ -18,8 +18,8 @@
 #define DT_MOTOR_R FEHMotor::Motor1
 #define DT_MOTOR_LV 12.0
 #define DT_MOTOR_RV 12.0
-#define MTR_ENCODE_R FEHIO::P1_1
-#define MTR_ENCODE_L FEHIO::P1_2
+#define MTR_ENCODE_R FEHIO::P0_6
+#define MTR_ENCODE_L FEHIO::P0_7
 #define COUNTS_PER_REV 318
 
 /* Servo Definitions */
@@ -49,6 +49,8 @@
 #define MAX 25.0
 #define MAIN_TURN 25.0
 #define FINE_TURN 5.0
+#define LINE_FOLLOW 10.0
+#define LINE_FOLLOW_STRAIGHT 20.0
 
 /* CdS Color Definitions */
 #define RED_LIGHT 0.0
@@ -122,7 +124,7 @@ typedef enum
 
 /* Code Dev Flags */
 #define RUN_STATE_MACHINE true
-#define USE_RPS true
+#define USE_RPS false
 #define QUIT_AFTER_ONE_STATE true
 #define INIT_CHECK false
 
