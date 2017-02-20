@@ -47,10 +47,11 @@
 /* Motor Speed Definitions */
 #define STOP 0.0
 #define MAX 25.0
-#define MAIN_TURN 25.0
-#define FINE_TURN 5.0
+#define TURN_MAIN 25.0
+#define TURN_FINE 5.0
 #define LINE_FOLLOW 10.0
 #define LINE_FOLLOW_STRAIGHT 20.0
+#define MOTOR_SPEED_RAMP_TIME 0.01
 
 /* CdS Color Definitions */
 #define RED_LIGHT 0.0
@@ -65,8 +66,8 @@
 /* Button Combination Definitions */
 typedef enum
 {
-    front,
-    back
+    FRONT,
+    BACK
 } ButtonSide;
 
 /* Robot State Defintions */

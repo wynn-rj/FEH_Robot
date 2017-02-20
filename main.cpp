@@ -157,10 +157,96 @@ int main(void)
 		switch (currentState)
 		{
         case waitToStart:
+            //This is being changed for performance tests
             if(readCdS() == RED)
             {
                 SD.Printf("\n==STARTING COURSE==\n\n");
-                queState(startMoveSat);
+                //queState(startMoveSat);
+
+                //Performance test
+                SD.Printf("Running Performace test 1\n");
+                driveDistance(MAX, 4);
+                while(!drivedDistance())
+                {
+                    drawRunningScreen();
+                    if(enablePID)
+                    {
+                        PIDCheck();
+                    }
+                }
+                drive(STOP);
+                turnBlind(LEFT, 90, TURN_MAIN);
+                drive(MAX);
+                while(!checkTouchingSide(FRONT))
+                {
+                    drawRunningScreen();
+                    if(enablePID)
+                    {
+                        PIDCheck();
+                    }
+                }
+                drive(STOP);
+                driveDistance(-MAX, 10);
+                while(!drivedDistance())
+                {
+                    drawRunningScreen();
+                    if(enablePID)
+                    {
+                        PIDCheck();
+                    }
+                }
+                drive(STOP);
+                turnBlind(RIGHT, 90, TURN_MAIN);
+                drive(-MAX);
+                while(!checkTouchingSide(BACK))
+                {
+                    drawRunningScreen();
+                    if(enablePID)
+                    {
+                        PIDCheck();
+                    }
+                }
+                drive(STOP);
+                for(int i = 0; i < 10; i++)
+                {
+                    Buzzer.Beep();
+                    Sleep(0.5);
+                    if(!checkTouchingSide(BACK))
+                    {
+                        i = 0;
+                        SD.Printf("[interactSismoBut] Haven't touched button for 5 seconds, resestting\n");
+                        Buzzer.Buzz();
+                        drive(-1*MAX);
+                        while(!checkTouchingSide(BACK));
+                        drive(STOP);
+                    }
+                }
+                LCD.SetBackgroundColor(RED);
+                LCD.SetBackgroundColor(BLACK);
+
+                driveDistance(MAX, 20);
+                while(!drivedDistance())
+                {
+                    drawRunningScreen();
+                    if(enablePID)
+                    {
+                        PIDCheck();
+                    }
+                }
+                drive(STOP);
+                turnBlind(RIGHT, 90, TURN_MAIN);
+                driveDistance(MAX, 15);
+                while(!drivedDistance() && !checkTouchingSide(FRONT))
+                {
+                    drawRunningScreen();
+                    if(enablePID)
+                    {
+                        PIDCheck();
+                    }
+                }
+                queState(shutdown);
+
+
             }
             break;
 
@@ -215,22 +301,25 @@ int main(void)
             break;
 
         case interactSismoBut:
-            if(!checkTouchingSide(back))
+            if(!checkTouchingSide(BACK))
             {
                 drive(-1*MAX);
-                while(!checkTouchingSide(back));
+                while(!checkTouchingSide(BACK))
+                {
+                    drawRunningScreen();
+                }
                 drive(STOP);
             }
             for(int i = 0; i < 10; i++)
             {
                 Buzzer.Beep();
                 Sleep(0.5);
-                if(!checkTouchingSide(back))
+                if(!checkTouchingSide(BACK))
                 {
                     i = 0;
                     SD.Printf("[interactSismoBut] Haven't touched button for 5 seconds, resestting\n");
                     drive(-1*MAX);
-                    while(!checkTouchingSide(back));
+                    while(!checkTouchingSide(BACK));
                     drive(STOP);
                 }
             }
@@ -285,8 +374,12 @@ int main(void)
                   y;
 
             drive(MAX);
-            while(!LCD.Touch(&x, &y));
+            while(!LCD.Touch(&x, &y))
+            {
+                drawRunningScreen();
+            }
             drive(STOP);
+            queState(shutdown);
             break;
 
         case startMoveDepCore:
@@ -330,7 +423,7 @@ int main(void)
 
                 rotateTo(SOUTH);
                 drive(-1*MAX);
-                while(!checkTouchingSide(back));
+                while(!checkTouchingSide(BACK));
                 drive(STOP);
 
                 queState(shutdown);
@@ -512,29 +605,10 @@ Course initMenu()
                                 } else {
                                     SD.Printf("Reading coords");
                                     LCD.Clear(BLACK);
-                                    LCD.WriteRC("X:",0,0);
-                                    LCD.WriteRC("Y:",1,0);
-                                    LCD.WriteRC("Head:", 2, 0);
-                                    LCD.WriteRC("Read time:", 4, 0);
-                                    Sleep(0.5);
-                                    LCD.WriteRC("LOPT: ",6,0);
-                                    LCD.WriteRC("MOPT: ",7,0);
-                                    LCD.WriteRC("ROPT: ",8,0);
-                                    double time, time2;
+
                                     while(!LCD.Touch(&x, &y))
                                     {
-                                        time = TimeNow();
-                                        LCD.WriteRC(RPS.X(), 0, 4);
-                                        LCD.WriteRC(RPS.Y(), 1, 4);
-                                        LCD.WriteRC(RPS.Heading(), 2, 7);
-                                        time2 = TimeNow();
-                                        LCD.WriteRC(time2-time, 4, 12);
-                                        //SD.Printf(time2-time);
-                                        //SD.Printf(" s\n");
-                                        LCD.WriteRC(" s ", 4, 23);
-                                        LCD.WriteRC(leftOpt.Value(), 6, 6);
-                                        LCD.WriteRC(middleOpt.Value(), 7, 6);
-                                        LCD.WriteRC(rightOpt.Value(), 8, 6);
+                                        drawRunningScreen();
                                     }
                                     noCourseSelected = false;
                                     runningCourse = false;
@@ -761,20 +835,20 @@ bool drivedDistance()
  *      Percent for left motor
  */
 void drive(float rMPercent, float lMPercent)
-{
-    if(rMPercent == 0)
-    {
-        rightMotor.Stop();
-    } else {
-        rightMotor.SetPercent(rMPercent);
-    }
+{    
+    float rMPerToChange = (rMPercent - rightMotorSpeed)/10.0;
+    float lMPerToChange = (lMPercent - leftMotorSpeed)/10.0;
 
-    if(lMPercent == 0)
+    for(int i = 0; i < 10; i++)
     {
-        leftMotor.Stop();
-    } else {
-        //The negative adjusts for the motor being mounted backwards
-        leftMotor.SetPercent(-1*lMPercent);
+        rightMotorSpeed += rMPerToChange;
+        leftMotorSpeed += lMPerToChange;
+
+        rightMotor.SetPercent(rightMotorSpeed);
+        leftMotor.SetPercent(leftMotorSpeed);
+
+        Sleep(MOTOR_SPEED_RAMP_TIME);
+
     }
 
     rightMotorSpeed = rMPercent;
@@ -790,6 +864,14 @@ void drive(float rMPercent, float lMPercent)
 void drive(float mPercent)
 {
     drive(mPercent, mPercent);
+    enablePID = true;
+}
+
+void driveDistance(float mPercent, float distance)
+{
+    distanceToTravel = distance;
+    drive(mPercent);
+    enablePID = true;
 }
 
 /**
@@ -802,10 +884,10 @@ bool checkTouchingSide(ButtonSide side)
     bool buttonsPressed = false;
 
     switch (side) {
-    case front:
+    case FRONT:
         buttonsPressed = !(buttonTopLeft.Value() || buttonTopRight.Value());
         break;
-    case back:
+    case BACK:
         buttonsPressed = !(buttonBottomLeft.Value() || buttonBottomRight.Value());
         break;
     default:
@@ -824,6 +906,7 @@ bool checkTouchingSide(ButtonSide side)
  */
 void turn(bool goRight, float speed)
 {
+    enablePID = false;
     int rDirection = (goRight) ? 1:-1;
     int lDirection = (goRight) ? -1:1;
 
@@ -878,10 +961,10 @@ void rotateTo(float directionToHead)
         turnDirection = LEFT;
     }
 
-    turn(turnDirection, MAIN_TURN);
+    turn(turnDirection, TURN_MAIN);
     while(abs(RPS.Heading() - directionToHead) > HEAD_ERR){}
     drive(STOP);
-    turn(turnDirection, FINE_TURN);
+    turn(turnDirection, TURN_FINE);
     while(abs(RPS.Heading() - directionToHead) > HEAD_ERR_FINE){}
     drive(STOP);
 
