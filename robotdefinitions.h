@@ -21,6 +21,7 @@
 #define MTR_ENCODE_R FEHIO::P0_6
 #define MTR_ENCODE_L FEHIO::P0_7
 #define COUNTS_PER_REV 318
+#define PID_MAX_DIFF 5.0
 
 /* Servo Definitions */
 #define SRV_ARM FEHServo::Servo0
@@ -35,18 +36,18 @@
 #define SRV_FRK_NO_EXT 0.0
 
 /* IO Pin Definitions */
-#define CDS_CELL FEHIO::P0_0
-#define BUTTON_TOP_LEFT FEHIO::P0_1
-#define BUTTON_TOP_RIGHT FEHIO::P0_2
-#define BUTTON_BOTTOM_LEFT FEHIO::P0_3
-#define BUTTON_BOTTOM_RIGHT FEHIO::P0_4
+#define CDS_CELL FEHIO::P1_0
+#define BUTTON_TOP_LEFT FEHIO::P3_7
+#define BUTTON_TOP_RIGHT FEHIO::P0_0
+#define BUTTON_BOTTOM_LEFT FEHIO::P3_6
+#define BUTTON_BOTTOM_RIGHT FEHIO::P0_1
 
 /* Wheel info in inches */
 #define WHEEL_RAD 1.25
 
 /* Motor Speed Definitions */
 #define STOP 0.0
-#define MAX 25.0
+#define MAX 35.0
 #define TURN_MAIN 25.0
 #define TURN_FINE 5.0
 #define LINE_FOLLOW 10.0
@@ -54,8 +55,8 @@
 #define MOTOR_SPEED_RAMP_TIME 0.01
 
 /* CdS Color Definitions */
-#define RED_LIGHT 0.0
-#define BLUE_LIGHT 0.0
+#define BLACK_LIGHT 2.0
+#define BLUE_LIGHT 1.0
 
 /* Direction Definitions */
 #define NORTH 90.0
@@ -114,19 +115,21 @@ typedef enum
 #define LEV_X 12.0
 #define LEV_Y 45.0
 #define BUT_X 25.0
-#define BUT_Y 61.0
+#define BUT_Y 54.0
 #define COR_X 18.5
 #define COR_Y 54.0
 #define DEP_X 12.0
 #define DEP_Y 15.5
 #define RET_X 6.0
 #define RET_Y 27.0
+#define CEN_X 18.0
+#define CEN_Y 45.0
 #define DEGREE_OFFSET 0.0
 
 /* Code Dev Flags */
 #define RUN_STATE_MACHINE true
 #define USE_RPS false
 #define QUIT_AFTER_ONE_STATE true
-#define INIT_CHECK false
+#define INIT_CHECK true
 
 #endif // ROBOTDEFINITIONS_H
