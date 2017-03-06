@@ -143,6 +143,7 @@ int main(void)
 {
     initialSetup();
 
+
     while(runningCourse)
     {
         //If trying to drive straight verify actually driving straight
@@ -183,9 +184,10 @@ int main(void)
                 int angle = 90;
                 SD.Printf("Running Performace test 2\n");
                 LCD.Clear(BLACK);
+                setForkLiftPos(SRV_FRK_FULL_EXT);
 
                 SD.Printf("Driving Forward\n");
-                driveDistance(MAX, 7.5);
+                driveDistance(MAX, 10.5);
                 while(!drivedDistance())
                 {
                     drawRunningScreen();
@@ -202,8 +204,8 @@ int main(void)
                     drive(-MAX);
                 }
                 drive(STOP);
-
-                driveDistance(MAX, 8);
+                /*
+                driveDistance(MAX, 5);
                 while(!drivedDistance())
                 {
                     drawRunningScreen();
@@ -215,7 +217,7 @@ int main(void)
                 drive(STOP);
                 SD.Printf("Turning\n");
                 turnBlind(LEFT, angle, TURN_MAIN);
-
+                */
                 SD.Printf("Driving till detect light\n");
                 drive(MAX);
                 while(readCdS() == BLACK)
@@ -226,11 +228,15 @@ int main(void)
                         PIDCheck();
                     }
                 }
+                Sleep(0.15);
                 drive(STOP);
                 readCdS();
-                Sleep(2);
+                Sleep(.5);
+                turn(RIGHT, TURN_MAIN);
+                Sleep(0.05);
+                drive(STOP);
                 SD.Printf("Light Found!\n");
-
+                /*
                 driveDistance(-MAX, 3);
                 while(!drivedDistance())
                 {
@@ -242,7 +248,7 @@ int main(void)
                 }
                 drive(STOP);
                 turnBlind(RIGHT, angle, TURN_MAIN);
-
+                */
                 SD.Printf("Driving till hit front\n");
                 drive(MAX);
                 while(!checkTouchingSide(FRONT))
@@ -266,8 +272,8 @@ int main(void)
                     }
                 }
                 drive(STOP);
-                turnBlind(LEFT, angle, TURN_MAIN);
-                driveDistance(-MAX, 18);
+                turnBlind(LEFT, angle-5, TURN_MAIN);
+                driveDistance(-MAX, 21);
                 while(!drivedDistance())
                 {
                     drawRunningScreen();
@@ -276,18 +282,13 @@ int main(void)
                         PIDCheck();
                     }
                 }
+                //Sleep(0.3);
                 drive(STOP);
                 turnBlind(LEFT, angle+5, TURN_MAIN);
-                driveDistance(MAX, 8);
-                while(!drivedDistance())
-                {
-                    drawRunningScreen();
-                    if(enablePID)
-                    {
-                        PIDCheck();
-                    }
-                }
+                drive(MAX);
+                Sleep(0.2);
                 drive(STOP);
+                setForkLiftPos(SRV_FRK_NO_EXT);
                 queState(shutdown);
 
                 /*
@@ -582,15 +583,15 @@ void initialSetup()
     enablePID = false;
     strcpy(screenMessage,"INIT");
 
-    //Starting SD log file
-    SD.OpenLog();
-    SD.Printf("Initializing Log\n");
-
     //Determine course robot located on
     if(USE_RPS)
     {
         RPS.InitializeTouchMenu();
     }
+
+    //Starting SD log file
+    SD.OpenLog();
+    SD.Printf("Initializing Log\n");    
 
     while(INIT_CHECK && !verifyStartConditions())
     {
@@ -786,8 +787,8 @@ void extendRetractArm(bool isExtending)
  */
 void setForkLiftPos(float percent)
 {
-    servoFrkPer = (percent/100)*(SRV_FRK_MAX-SRV_FRK_MIN) + SRV_FRK_MIN;
-    servoForkLift.SetDegree(servoFrkPer);
+    //servoFrkPer = (percent/100)*(SRV_FRK_MAX-SRV_FRK_MIN) + SRV_FRK_MIN;
+    servoForkLift.SetDegree(percent);
 }
 
 /**
@@ -1002,7 +1003,7 @@ void driveDistance(float mPercent, float distance)
 {
     rightEncoder.ResetCounts();
     leftEncoder.ResetCounts();
-    distanceToTravel = distance;
+    distanceToTravel = 1.5*distance;
     drive(mPercent);
     enablePID = true;
     SD.Printf("Driving at speed %f for distance %f\n", mPercent, distance);
@@ -1194,34 +1195,34 @@ void driveToCoord(Coord pos)
  */
 void PIDCheck()
 {
-    /*
-    if(leftEncoder.Counts() > rightEncoder.Counts())
-    {
-        if(abs(leftMotorSpeed-rightMotorSpeed) <= PID_MAX_DIFF)
+    if(PID_ALLOW){
+        if(leftEncoder.Counts() < rightEncoder.Counts())
         {
-            if(rightMotorSpeed > 0)
+            if(abs(leftMotorSpeed-rightMotorSpeed) <= PID_MAX_DIFF)
             {
-                rightMotorSpeed -= 1;
-            } else {
-                rightMotorSpeed += 1;
+                if(rightMotorSpeed > 0)
+                {
+                    rightMotorSpeed -= 1;
+                } else {
+                    rightMotorSpeed += 1;
+                }
+                rightMotor.SetPercent(rightMotorSpeed);
             }
-            rightMotor.SetPercent(rightMotorSpeed);
+        }
+        else if(leftEncoder.Counts() > rightEncoder.Counts())
+        {
+            if(abs(leftMotorSpeed-rightMotorSpeed) <= PID_MAX_DIFF)
+            {
+                if(leftMotorSpeed > 0)
+                {
+                    leftMotorSpeed -= 1;
+                } else {
+                    leftMotorSpeed += 1;
+                }
+                leftMotor.SetPercent(leftMotorSpeed);
+            }
         }
     }
-    else if(leftEncoder.Counts() < rightEncoder.Counts())
-    {
-        if(abs(leftMotorSpeed-rightMotorSpeed) <= PID_MAX_DIFF)
-        {
-            if(leftMotorSpeed > 0)
-            {
-                leftMotorSpeed -= 1;
-            } else {
-                leftMotorSpeed += 1;
-            }
-            leftMotor.SetPercent(leftMotorSpeed);
-        }
-    }
-    */
 
 }
 

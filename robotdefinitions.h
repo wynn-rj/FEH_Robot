@@ -26,13 +26,13 @@
 /* Servo Definitions */
 #define SRV_ARM FEHServo::Servo0
 #define SRV_FRK_LFT FEHServo::Servo1
-#define SRV_MAX 2945
-#define SRV_MIN 500
-#define SRV_FRK_MAX 2945
-#define SRV_FRK_MIN 500
+#define SRV_MAX 2215
+#define SRV_MIN 710
+#define SRV_FRK_MAX 2215
+#define SRV_FRK_MIN 710
 #define SERVO_FULL_EXT 90.0
 #define SERVO_NO_EXT 0.0
-#define SRV_FRK_FULL_EXT 90.0
+#define SRV_FRK_FULL_EXT 160.0
 #define SRV_FRK_NO_EXT 0.0
 
 /* IO Pin Definitions */
@@ -131,5 +131,6 @@ typedef enum
 #define USE_RPS false
 #define QUIT_AFTER_ONE_STATE true
 #define INIT_CHECK true
+#define PID_ALLOW false
 
 #endif // ROBOTDEFINITIONS_H
