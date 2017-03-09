@@ -23,24 +23,34 @@
 #define COUNTS_PER_REV 318
 #define PID_MAX_DIFF 5.0
 
+#define MTR_FRK_LFT FEHMotor::Motor2
+#define MTR_FRK_V 5.0
+#define FRK_FULL_EXT 100.0
+#define FRK_NO_EXT 0.0
+//Speeds
+#define FRK_UP 40.0
+#define FRK_DOWN -40.0
+
 /* Servo Definitions */
 #define SRV_ARM FEHServo::Servo0
-#define SRV_FRK_LFT FEHServo::Servo1
 #define SRV_MAX 2215
 #define SRV_MIN 710
-#define SRV_FRK_MAX 2215
-#define SRV_FRK_MIN 710
 #define SERVO_FULL_EXT 90.0
 #define SERVO_NO_EXT 0.0
-#define SRV_FRK_FULL_EXT 160.0
-#define SRV_FRK_NO_EXT 0.0
 
 /* IO Pin Definitions */
-#define CDS_CELL FEHIO::P1_0
+#define CDS_CELL FEHIO::P1_7
 #define BUTTON_TOP_LEFT FEHIO::P3_7
 #define BUTTON_TOP_RIGHT FEHIO::P0_0
 #define BUTTON_BOTTOM_LEFT FEHIO::P3_6
 #define BUTTON_BOTTOM_RIGHT FEHIO::P0_1
+#define BUTTON_FRK_TOP FEHIO::P1_1
+#define BUTTON_FRK_BOT FEHIO::P1_0
+
+/* OPTOSENSORS */
+#define OPTO_LEFT FEHIO::P2_0
+#define OPTO_CENTER FEHIO::P2_1
+#define OPTO_RIGHT FEHIO::P2_3
 
 /* Wheel info in inches */
 #define WHEEL_RAD 1.25
@@ -49,7 +59,7 @@
 #define STOP 0.0
 #define MAX 35.0
 #define TURN_MAIN 25.0
-#define TURN_FINE 5.0
+#define TURN_FINE 10.0
 #define LINE_FOLLOW 10.0
 #define LINE_FOLLOW_STRAIGHT 20.0
 #define MOTOR_SPEED_RAMP_TIME 0.01
@@ -108,28 +118,32 @@ typedef enum
 #define LEFT false
 #define HEAD_ERR 5.0
 #define HEAD_ERR_FINE 1.0
+#define RIGHT_MOTOR_MODIFIER -1
+#define LEFT_MOTOR_MODIFIER 1
 
 /* Course Coordinates */
 #define SAT_X 29.5
-#define SAT_Y 15.0
+#define SAT_Y 19.0
 #define LEV_X 12.0
 #define LEV_Y 45.0
 #define BUT_X 25.0
 #define BUT_Y 54.0
-#define COR_X 18.5
+#define COR_X 19
 #define COR_Y 54.0
 #define DEP_X 12.0
 #define DEP_Y 15.5
 #define RET_X 6.0
 #define RET_Y 27.0
-#define CEN_X 18.0
-#define CEN_Y 45.0
+#define BOT_X 19.0
+#define BOT_Y 20.0
+#define TOP_X 19.0
+#define TOP_Y 45.0
 #define DEGREE_OFFSET 0.0
 
 /* Code Dev Flags */
 #define RUN_STATE_MACHINE true
-#define USE_RPS false
-#define QUIT_AFTER_ONE_STATE true
+#define USE_RPS true
+#define QUIT_AFTER_ONE_STATE false
 #define INIT_CHECK true
 #define PID_ALLOW false
 
