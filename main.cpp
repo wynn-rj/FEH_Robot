@@ -79,7 +79,7 @@ DigitalEncoder leftEncoder(MTR_ENCODE_L);
 //Servos
 FEHServo servoArm(SRV_ARM);
 
-//Corner bumb buttons
+//Corner bump buttons
 DigitalInputPin buttonTopLeft(BUTTON_TOP_LEFT);
 DigitalInputPin buttonTopRight(BUTTON_TOP_RIGHT);
 DigitalInputPin buttonBottomLeft(BUTTON_BOTTOM_LEFT);
@@ -150,6 +150,7 @@ int main(void)
 {
     initialSetup();
 
+    unsigned int waitTime = TimeNowSec();
 
     while(runningCourse)
     {
@@ -167,7 +168,8 @@ int main(void)
 		{
         case waitToStart:
             //This is being changed for performance tests
-            if(readCdS() == RED)
+
+            if(readCdS() != BLACK || (TimeNowSec() - waitTime > 20))
             {
                 /*
                 //ACTUAL STATE
@@ -192,7 +194,7 @@ int main(void)
 
                 //Performance test
                 int angle = 90;
-                SD.Printf("Running Performace test 3\n");
+                SD.Printf("Running Performace test 4\n");
                 LCD.Clear(BLACK);
                 //setForkLiftPos(FRK_FULL_EXT);
 
@@ -206,15 +208,17 @@ int main(void)
                         PIDCheck();
                     }
                 }
-                Sleep(0.1);
+                Sleep(0.15);
                 drive(STOP);
                 SD.Printf("Turning\n");
                 turnBlind(RIGHT, angle-5, TURN_MAIN);
-                while(!checkTouchingSide(BACK))
+                unsigned int time = TimeNowSec();
+                while(!checkTouchingSide(BACK) && (TimeNowSec() - time < 5))
                 {
-                    drive(-MAX);
+                    drive(-0.5*MAX);
                 }
                 drive(STOP);
+                Sleep(0.1);
                 SD.Printf("Back found, x coordinate confirmed\n");
                 /*
                 driveDistance(MAX, 5);
@@ -241,10 +245,10 @@ int main(void)
                         PIDCheck();
                     }
                 }
-                Sleep(0.2);
+                //Sleep(0.2);
                 drive(STOP);
                 binColor = readCdS();
-                SD.Printf("Light Found!\n");
+                SD.Printf("Light Found!  Color: %s\n", (binColor == RED) ? "Red":"Blue");
                 /*
                 driveDistance(-MAX, 3);
                 while(!drivedDistance())
@@ -261,7 +265,8 @@ int main(void)
 
                 SD.Printf("Driving till hit front\n");
                 drive(MAX);
-                while(!checkTouchingSide(FRONT))
+                time = TimeNowSec();
+                while(!checkTouchingSide(FRONT) && (TimeNowSec() - time < 10))
                 {
                     drawRunningScreen();
                     if(enablePID)
@@ -270,11 +275,11 @@ int main(void)
                     }
                 }
                 drive(STOP);
-                SD.Printf("Front found, x coordinate confirmed\n");
-                strcpy(screenMessage, "Front found, x coordinate confirmed");
+                SD.Printf("Front found, turning satelite\n");
+                strcpy(screenMessage, "Front found, turning satelite");
                 //drive up not mud ramp
-
-                driveDistance(-MAX, 8);
+                extendRetractArm(true);
+                driveDistance(-MAX, 7.0);
                 while(!drivedDistance())
                 {
                     drawRunningScreen();
@@ -284,14 +289,62 @@ int main(void)
                     }
                 }
                 drive(STOP);
+                extendRetractArm(false);
+
+
+                driveDistance(MAX, 3.0);
+                while(!drivedDistance())
+                {
+                    drawRunningScreen();
+                    if(enablePID)
+                    {
+                        PIDCheck();
+                    }
+                }
+                //Sleep(0.1);
+                drive(STOP);
+
+                setForkLiftPos(FRK_NO_EXT);
+
+                rotateTo(WEST);
+                SD.Printf("Driving till hit front\n");
+                drive(-MAX);
+                time = TimeNowSec();
+                while(!checkTouchingSide(BACK) && (TimeNowSec() - time < 10))
+                {
+                    drawRunningScreen();
+                    if(enablePID)
+                    {
+                        PIDCheck();
+                    }
+                }
+                drive(STOP);
+
+                driveDistance(MAX, 5);
+                while(!drivedDistance())
+                {
+                    drawRunningScreen();
+                    if(enablePID)
+                    {
+                        PIDCheck();
+                    }
+                }
+                Sleep(0.4);
+                drive(STOP);
+
+                rotateTo(SOUTH);
 
                 SD.Printf("At base of ramp\n");
                 strcpy(screenMessage, "At base of ramp");
                 drawRunningScreen();
 
-                turnBlind(LEFT, angle-5, TURN_MAIN);
-                driveDistance(-MAX, 23);
-                while(!drivedDistance())
+                motorForkLift.SetPercent(FRK_UP);
+                Sleep(2.0);
+                motorForkLift.SetPercent(STOP);
+
+                driveDistance(-MAX, 18);
+                time = TimeNowSec();
+                while(!drivedDistance() && (TimeNowSec() - time < 5))
                 {
                     drawRunningScreen();
                     if(enablePID)
@@ -300,43 +353,45 @@ int main(void)
                     }
                 }
                 drive(STOP);
-
+                /*
                 SD.Printf("Rotating to core\n");
                 strcpy(screenMessage, "Rotating to core");
                 drawRunningScreen();
 
-                rotateTo(NORTH);
-                while(abs(RPS.Y - currentCourse.core.y) > 1)
+                setForkLiftPos(FRK_NO_EXT);
+
+                rotateTo(WEST);
+                while(abs(RPS.X() - currentCourse.core.x) > 1.0)
                 {
-                    if(RPS.Y >  currentCourse.core.y)
+                    if(RPS.X() > currentCourse.core.x)
                     {
-                        drive(-MAX);
-                        Sleep(0.2);
+                        drive(TURN_MAIN);
+                        Sleep(0.1);
                         drive(STOP);
                     } else {
-                        drive(MAX);
-                        Sleep(0.2);
+                        drive(-TURN_MAIN);
+                        Sleep(0.1);
                         drive(STOP);
                     }
                 }
 
-                rotateTo(WEST);
-                while(abs(RPS.X - currentCourse.core.x) > 1)
+                rotateTo(NORTH);
+                while(abs(RPS.Y() - currentCourse.core.y) > 0.8)
                 {
-                    if(RPS.X >  currentCourse.core.x)
+                    if(RPS.Y() > currentCourse.core.y)
                     {
-                        drive(MAX);
-                        Sleep(0.2);
+                        drive(-TURN_MAIN);
+                        Sleep(0.1);
                         drive(STOP);
                     } else {
-                        drive(-MAX);
-                        Sleep(0.2);
+                        drive(TURN_MAIN);
+                        Sleep(0.1);
                         drive(STOP);
                     }
                 }
 
                 setForkLiftPos(FRK_NO_EXT);
-                rotateTo((NORTH+WEST)/2);
+                rotateTo((NORTH+WEST)/2 + 1);
 
                 SD.Printf("Lowering forklift\n");
                 strcpy(screenMessage, "Lowering forklift");
@@ -347,14 +402,18 @@ int main(void)
                 SD.Printf("Line following\n");
                 strcpy(screenMessage, "Line following");
                 drawRunningScreen();
-                followLine(15);
+                followLine(12);
 
                 SD.Printf("Grabing core\n");
                 strcpy(screenMessage, "Grabing core");
                 drawRunningScreen();
 
+                drive(-.5*MAX);
+                Sleep(0.01);
+                drive(STOP);
+
                 motorForkLift.SetPercent(FRK_UP);
-                Sleep(0.5);
+                Sleep(1.0);
                 motorForkLift.SetPercent(STOP);
                 drive(-MAX);
                 Sleep(1.25);
@@ -366,12 +425,19 @@ int main(void)
                 drawRunningScreen();
 
                 turnBlind(LEFT, 45, TURN_MAIN);
+
                 drive(-MAX);
                 Sleep(0.5);
                 drive(STOP);
+                */
                 rotateTo(NORTH);
-                driveDistance(-MAX, 22);
-                while(!drivedDistance())
+                motorForkLift.SetPercent(FRK_UP);
+                Sleep(2.0);
+                motorForkLift.SetPercent(STOP);
+                driveDistance(-MAX, 16);
+
+                time = TimeNowSec();
+                while(!drivedDistance() && (TimeNowSec() - time < 5))
                 {
                     drawRunningScreen();
                     if(enablePID)
@@ -381,13 +447,16 @@ int main(void)
                 }
                 drive(STOP);
 
+                /*
                 SD.Printf("Moving to deposit\n");
                 strcpy(screenMessage, "Moving to deposit");
                 drawRunningScreen();
                 turnBlind(RIGHT, angle-5, TURN_MAIN);
 
-                drive(-MAX);
-                while(!checkTouchingSide(BACK))
+                drive(-.5*MAX);
+                unsigned int time = TimeNowSec();
+
+                while(!checkTouchingSide(BACK) && (TimeNowSec() - time < 10))
                 {
                     drawRunningScreen();
                     if(enablePID)
@@ -397,13 +466,16 @@ int main(void)
                 }
                 drive(STOP);
 
+                float xVal;
                 if(binColor == RED)
                 {
-                    driveDistance(MAX, 16);
+                    driveDistance(MAX, 12);
+                    xVal = 8;
                 }
                 else
                 {
-                    driveDistance(MAX, 14);
+                    driveDistance(MAX, 8);
+                    xVal = 16;
                 }
                 while(!drivedDistance())
                 {
@@ -411,6 +483,19 @@ int main(void)
                     if(enablePID)
                     {
                         PIDCheck();
+                    }
+                }
+                while(abs(RPS.X() - xVal) > 1.0)
+                {
+                    if(RPS.X() > xVal)
+                    {
+                        drive(TURN_MAIN);
+                        Sleep(0.1);
+                        drive(STOP);
+                    } else {
+                        drive(-TURN_MAIN);
+                        Sleep(0.1);
+                        drive(STOP);
                     }
                 }
 
@@ -418,10 +503,14 @@ int main(void)
                 strcpy(screenMessage, "Dropping core");
                 drawRunningScreen();
 
-                turnBlind(RIGHT, angle-5, TURN_MAIN);
+                turnBlind(RIGHT, angle-3, TURN_MAIN);
                 setForkLiftPos(FRK_FULL_EXT);
                 drive(MAX);
-                while(!checkTouchingSide(FRONT))
+
+                time = TimeNowSec();
+
+
+                while(!checkTouchingSide(FRONT) && (TimeNowSec() - time < 5))
                 {
                     drawRunningScreen();
                     if(enablePID)
@@ -434,6 +523,15 @@ int main(void)
                 Sleep(0.1);
                 drive(STOP);
                 setForkLiftPos(FRK_NO_EXT);
+                drive(-MAX);
+                Sleep(0.15);
+                drive(STOP);
+                motorForkLift.SetPercent(FRK_UP);
+                Sleep(2.0);
+                motorForkLift.SetPercent(STOP);
+                drive(MAX);
+                Sleep(0.15);
+                drive(STOP);
                 driveDistance(-MAX, 5);
                 while(!drivedDistance())
                 {
@@ -445,7 +543,35 @@ int main(void)
                 }
                 drive(STOP);
 
+                */
+                setForkLiftPos(FRK_NO_EXT);
+                rotateTo(EAST);
+                drive(-MAX);
 
+                time = TimeNowSec();
+                while(!checkTouchingSide(BACK) && (TimeNowSec() - time < 10))
+                {
+                    drawRunningScreen();
+                    if(enablePID)
+                    {
+                        PIDCheck();
+                    }
+                }
+                drive(STOP);
+                drive(MAX);
+                Sleep(0.15);
+                rotateTo(SOUTH);
+                drive(-MAX);
+                time = TimeNowSec();
+                while(buttonBottomLeft.Value() && buttonBottomRight.Value() && (TimeNowSec() - time < 3))
+                {
+                    drawRunningScreen();
+                    if(enablePID)
+                    {
+                        PIDCheck();
+                    }
+                }
+                drive(STOP);
 
 
                 /*
@@ -1067,15 +1193,18 @@ void setForkLiftPos(float percent)
         if(buttonForkLiftBottom.Value()){
             motorForkLift.SetPercent(FRK_UP);
         }
-        while(buttonForkLiftBottom.Value());
+        unsigned int time = TimeNowSec();
+
+        while(buttonForkLiftBottom.Value() && (TimeNowSec() - time < 10));
     }
     else if (percent < 5.0)
     {
         if(buttonForkLiftTop.Value()){
             motorForkLift.SetPercent(FRK_UP);
         }
-        motorForkLift.SetPercent(FRK_DOWN);        
-        while(buttonForkLiftTop.Value());
+        motorForkLift.SetPercent(FRK_DOWN);
+        unsigned int time = TimeNowSec();
+        while(buttonForkLiftTop.Value() && (TimeNowSec() - time < 10));
     }
     SD.Printf("Percent reached!\n");
     motorForkLift.SetPercent(STOP);
@@ -1250,6 +1379,7 @@ bool drivedDistance()
  */
 void drive(float rMPercent, float lMPercent)
 {    
+    //lMPercent *= 1.015;
     float rMPerToChange = (rMPercent - rightMotorSpeed)/10.0;
     float lMPerToChange = (lMPercent - leftMotorSpeed)/10.0;
 
@@ -1402,10 +1532,12 @@ void rotateTo(float directionToHead)
           rightDistance = directionToHead - currHeading;
     bool turnDirection;
 
-    while(RPS.Heading() < 0)
+    while(currHeading < 0)
     {
         Buzzer.Buzz(5);
         currHeading = RPS.Heading();
+        SD.Printf("Can't get heding, turning to get heading\n");
+        turnBlind(LEFT, 2.0, TURN_FINE);
     }
 
     SD.Printf("At heading: %f moving to heading: %f\n", currHeading, directionToHead);
@@ -1421,17 +1553,19 @@ void rotateTo(float directionToHead)
         turnDirection = LEFT;
     }
 
-    turnBlind(turnDirection, abs(RPS.Heading() - directionToHead), TURN_MAIN);
-    SD.Printf("Checking heading with rps");
-    while(abs(RPS.Heading() - directionToHead) > 2)
+    turnBlind(turnDirection, (turnDirection == RIGHT) ? rightDistance : leftDistance, TURN_MAIN);
+    SD.Printf("Checking heading with rps\n");
+    while(abs(RPS.Heading() - directionToHead) > 1.5)
     {
-        while(RPS.Heading() < 0)
+        if(RPS.Heading() >= 0)
         {
-            Buzzer.Buzz(5);
+            SD.Printf("RPS Read Success   ");
+            currHeading = RPS.Heading();
+        } else {
+            SD.Printf("RPS Read Failure   ");
         }
         drawRunningScreen();
-        currHeading = RPS.Heading();
-        SD.Printf("Error: %f Heading: %f  ", abs(RPS.Heading() - directionToHead), RPS.Heading());
+        SD.Printf("Error: %f Heading: %f  ", abs(currHeading - directionToHead), currHeading);
         leftDistance = currHeading - directionToHead,
         rightDistance = directionToHead - currHeading;
 
@@ -1441,8 +1575,10 @@ void rotateTo(float directionToHead)
         if(rightDistance < leftDistance)
         {
             turnDirection = RIGHT;
+            currHeading++;
         } else {
             turnDirection = LEFT;
+            currHeading--;
         }
 
         turnBlind(turnDirection, 2.0, TURN_FINE);
@@ -1564,7 +1700,9 @@ void followLine(float distance)
     leftEncoder.ResetCounts();
     distanceToTravel = distance;
 
-    while(!drivedDistance())
+    unsigned int time = TimeNowSec();
+
+    while(!drivedDistance() && (TimeNowSec() - time < 5))
     {
         rightVal = rightOpt.Value();
         middleVal = middleOpt.Value();

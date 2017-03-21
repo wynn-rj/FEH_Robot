@@ -33,10 +33,10 @@
 
 /* Servo Definitions */
 #define SRV_ARM FEHServo::Servo0
-#define SRV_MAX 2215
-#define SRV_MIN 710
-#define SERVO_FULL_EXT 90.0
-#define SERVO_NO_EXT 0.0
+#define SRV_MAX 2365
+#define SRV_MIN 500
+#define SERVO_FULL_EXT 130.0
+#define SERVO_NO_EXT 45.0
 
 /* IO Pin Definitions */
 #define CDS_CELL FEHIO::P1_7
@@ -59,14 +59,14 @@
 #define STOP 0.0
 #define MAX 35.0
 #define TURN_MAIN 25.0
-#define TURN_FINE 10.0
+#define TURN_FINE 15.0
 #define LINE_FOLLOW 10.0
 #define LINE_FOLLOW_STRAIGHT 20.0
 #define MOTOR_SPEED_RAMP_TIME 0.01
 
 /* CdS Color Definitions */
 #define BLACK_LIGHT 2.0
-#define BLUE_LIGHT 1.0
+#define BLUE_LIGHT 1.2
 
 /* Direction Definitions */
 #define NORTH 90.0
@@ -128,8 +128,8 @@ typedef enum
 #define LEV_Y 45.0
 #define BUT_X 25.0
 #define BUT_Y 54.0
-#define COR_X 19
-#define COR_Y 54.0
+#define COR_X 19.5
+#define COR_Y 53.7
 #define DEP_X 12.0
 #define DEP_Y 15.5
 #define RET_X 6.0
