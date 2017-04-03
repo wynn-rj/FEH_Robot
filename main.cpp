@@ -195,7 +195,7 @@ int main(void)
                     PIDCheck();
                 }
             }
-            Sleep(0.2);
+            Sleep(0.1);
             drive(STOP);
             SD.Printf("Turning\n");
             turnBlind(RIGHT, 85, TURN_MAIN);
