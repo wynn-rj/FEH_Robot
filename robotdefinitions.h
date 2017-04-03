@@ -28,8 +28,8 @@
 #define FRK_FULL_EXT 100.0
 #define FRK_NO_EXT 0.0
 //Speeds
-#define FRK_UP 40.0
-#define FRK_DOWN -40.0
+#define FRK_UP 80.0
+#define FRK_DOWN -80.0
 
 /* Servo Definitions */
 #define SRV_ARM FEHServo::Servo0
@@ -127,9 +127,9 @@ typedef enum
 #define LEV_X 12.0
 #define LEV_Y 45.0
 #define BUT_X 25.0
-#define BUT_Y 54.0
-#define COR_X 19.5
-#define COR_Y 53.7
+#define BUT_Y 54.2
+#define COR_X 19.2
+#define COR_Y 50.9
 #define DEP_X 12.0
 #define DEP_Y 15.5
 #define RET_X 6.0

@@ -1,2 +1,2 @@
    text	   data	    bss	    dec	    hex	filename
-  81404	   3424	   6352	  91180	  1642c	../FEH_Robot.elf
+  77912	   3424	   6348	  87684	  15684	../FEH_Robot.elf
