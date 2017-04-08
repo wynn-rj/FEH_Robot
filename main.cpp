@@ -195,7 +195,7 @@ int main(void)
                     PIDCheck();
                 }
             }
-            Sleep(0.1);
+            Sleep(0.15);
             drive(STOP);
             SD.Printf("Turning\n");
             turnBlind(RIGHT, 85, TURN_MAIN);
@@ -355,7 +355,8 @@ int main(void)
             //rotateTo(WEST);
             turnBlind(LEFT, 83, TURN_MAIN);
             drive(-MAX);
-            while(!checkTouchingSide(BACK))
+            time = TimeNow();
+            while(!checkTouchingSide(BACK) && (TimeNowSec() - time < 3))
             {
                 drawRunningScreen();
                 if(enablePID)
@@ -371,7 +372,8 @@ int main(void)
             drive(-MAX);
 
             SD.Printf("Moving to hit button\n");
-            while(buttonBottomLeft.Value() && buttonBottomRight.Value())
+            time = TimeNowSec();
+            while(buttonBottomLeft.Value() && buttonBottomRight.Value() && (TimeNowSec() - time < 5))
             {
                 drawRunningScreen();
                 if(enablePID)
@@ -502,7 +504,7 @@ int main(void)
         case moveToCore:
             setForkLiftPos(FRK_NO_EXT);
             SD.Printf("Current Pos: (%f,%f)", RPS.X(), RPS.Y());
-            rotateTo((NORTH+WEST)/2 + 2);
+            rotateTo((NORTH+WEST)/2);
 
             SD.Printf("Line following\n");
             strcpy(screenMessage, "Line following");
@@ -570,6 +572,7 @@ int main(void)
             drive(STOP);
             setForkLiftPos(FRK_NO_EXT);
             queState(startMoveRet);
+            //queState(moveToDepCore);
             break;
 
         case moveToDepCore:
@@ -610,7 +613,8 @@ int main(void)
                     PIDCheck();
                 }
             }
-            while(abs(RPS.X() - xVal) > .5)
+            time = TimeNow();
+            while(abs(RPS.X() - xVal) > .75  && (TimeNowSec() - time < 5))
             {
                 if(RPS.X() > xVal)
                 {
@@ -649,7 +653,7 @@ int main(void)
             }
             drive(STOP);
             drive(-MAX);
-            Sleep(0.15);
+            Sleep(0.1);
             drive(STOP);
             setForkLiftPos(FRK_NO_EXT);
             drive(-MAX);
@@ -697,13 +701,14 @@ int main(void)
             break;
 
         case moveToRet:
+            SD.Printf("Closing Log\n");
+            SD.CloseLog();
             drive(-MAX);
 
             queState(shutdown);
             break;
 
         case shutdown:
-            SD.Printf("Course complete!\n");
             runningCourse = false;
             break;
 
@@ -714,10 +719,7 @@ int main(void)
     }
 
     LCD.Clear(BLACK);
-    LCD.WriteLine("Shutting down..");
-    //Closing SD log file
-    SD.Printf("Closing Log\n");
-    SD.CloseLog();
+
 
     //Ending Program
     return 0;
